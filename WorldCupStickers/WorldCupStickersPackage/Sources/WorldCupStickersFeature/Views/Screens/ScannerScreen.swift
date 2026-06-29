@@ -94,7 +94,7 @@ struct ScannerScreen: View {
                         .padding(.vertical, 10)
                 }
                 .disabled(scanner.availableLenses.count < 2)
-                .stickerGlass(cornerRadius: 18)
+                .stickerGlass(cornerRadius: 16)
                 .accessibilityLabel("Switch camera lens")
                 .accessibilityIdentifier("switchLensButton")
                 .accessibilityHint("Toggles between the 0.5x close-up camera and the 1x camera when available.")
@@ -138,7 +138,7 @@ struct ScannerScreen: View {
                 }
                 .multilineTextAlignment(.center)
                 .padding(16)
-                .stickerGlass(cornerRadius: 22)
+                .stickerGlass(cornerRadius: 20)
             }
             .padding()
         }

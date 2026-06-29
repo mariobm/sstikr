@@ -1,8 +1,14 @@
 import SwiftUI
 
 extension View {
-    func stickerGlass(cornerRadius: CGFloat = 24) -> some View {
+    /// Liquid glass. Reserved for surfaces that earn translucency (over-camera overlays, hero imagery).
+    func stickerGlass(cornerRadius: CGFloat = 20) -> some View {
         modifier(StickerGlassModifier(cornerRadius: cornerRadius))
+    }
+
+    /// Quiet opaque card with a hairline border. The default surface for grouped content.
+    func stickerCard(cornerRadius: CGFloat = 16) -> some View {
+        modifier(StickerCardModifier(cornerRadius: cornerRadius))
     }
 }
 
@@ -20,6 +26,22 @@ private struct StickerGlassModifier: ViewModifier {
     }
 }
 
+private struct StickerCardModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.cardSurface)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.hairline, lineWidth: 1)
+            }
+    }
+}
+
 extension Color {
     static let stickerCanvas = Color(red: 0.965, green: 0.968, blue: 0.956)
     static let stickerMist = Color(red: 0.89, green: 0.94, blue: 0.95)
@@ -29,6 +51,11 @@ extension Color {
     static let stickerGold = Color(red: 0.93, green: 0.67, blue: 0.12)
     static let stickerBlue = Color(red: 0.10, green: 0.28, blue: 0.64)
     static let stickerBerry = Color(red: 0.76, green: 0.12, blue: 0.29)
+
+    /// Card surface: a shade brighter than the canvas so cards read as a quiet raised layer.
+    static let cardSurface = Color(red: 0.992, green: 0.994, blue: 0.984)
+    /// Hairline border for cards.
+    static let hairline = Color.stickerInk.opacity(0.07)
 
     init(hex: String, fallback: Color = .stickerTeal) {
         let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
@@ -52,21 +79,11 @@ struct StickerBackdrop: View {
             Color.stickerCanvas
             LinearGradient(
                 colors: [
-                    Color.stickerMist,
-                    Color.white.opacity(0.52),
-                    Color.stickerGold.opacity(0.18)
+                    Color.stickerMist.opacity(0.55),
+                    Color.stickerCanvas.opacity(0)
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            LinearGradient(
-                colors: [
-                    Color.stickerBlue.opacity(0.16),
-                    Color.clear,
-                    Color.stickerOrange.opacity(0.14)
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
+                startPoint: .top,
+                endPoint: .center
             )
         }
         .ignoresSafeArea()

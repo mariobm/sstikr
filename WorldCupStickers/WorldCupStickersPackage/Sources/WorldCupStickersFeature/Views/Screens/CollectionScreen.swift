@@ -4,26 +4,39 @@ import SwiftUI
 @MainActor
 struct CollectionScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \OwnedSticker.updatedAt, order: .reverse) private var ownedStickers: [OwnedSticker]
     @State private var searchText = ""
     @State private var filter: CollectionFilter = .all
     @State private var selectedGroup: String?
+    @State private var editError: String?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 24) {
                     header
                     groupStrip
                     filterPicker
                     stickerGrid
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 18)
+                .padding(.vertical, 20)
             }
             .background(StickerBackdrop())
             .navigationTitle("Collection")
             .searchable(text: $searchText, prompt: "Search team, player, or code")
+            .alert(
+                "Could not update sticker",
+                isPresented: Binding(
+                    get: { editError != nil },
+                    set: { if !$0 { editError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(editError ?? "")
+            }
         }
     }
 
@@ -31,19 +44,19 @@ struct CollectionScreen: View {
         let summary = catalog.summary(for: ownedStickers)
 
         return VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center, spacing: 18) {
-                ProgressRing(progress: summary.completion, lineWidth: 12)
-                    .frame(width: 96, height: 96)
+            HStack(alignment: .center, spacing: 20) {
+                ProgressRing(progress: summary.completion, lineWidth: 10)
+                    .frame(width: 88, height: 88)
 
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Album progress")
-                        .font(.caption.weight(.bold))
-                        .textCase(.uppercase)
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                     Text("\(summary.ownedUniqueCount) / \(summary.totalStickers)")
                         .font(.system(.title, design: .rounded, weight: .bold))
                         .monospacedDigit()
-                    Text("Remote artwork unlocks as stickers are added.")
+                        .foregroundStyle(Color.stickerInk)
+                    Text("Artwork unlocks as stickers are added.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -56,8 +69,8 @@ struct CollectionScreen: View {
                 StatPill(title: "Duplicates", value: "\(summary.duplicateCount)", tint: .stickerOrange)
             }
         }
-        .padding(20)
-        .stickerGlass()
+        .padding(16)
+        .stickerCard()
         .accessibilityIdentifier("collectionSummary")
     }
 
@@ -67,7 +80,6 @@ struct CollectionScreen: View {
                 GroupFilterChip(
                     title: "All",
                     subtitle: "\(catalog.teams.count) teams",
-                    tint: .stickerInk,
                     isSelected: selectedGroup == nil
                 ) {
                     selectedGroup = nil
@@ -78,7 +90,6 @@ struct CollectionScreen: View {
                     GroupFilterChip(
                         title: "Group \(groupCode)",
                         subtitle: progress.formatted(.percent.precision(.fractionLength(0))),
-                        tint: groupTint(groupCode),
                         isSelected: selectedGroup == groupCode
                     ) {
                         selectedGroup = groupCode
@@ -101,9 +112,15 @@ struct CollectionScreen: View {
     }
 
     private var stickerGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 12)], spacing: 12) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
             ForEach(filteredStickers) { sticker in
-                StickerTile(definition: sticker, owned: ownedByID[sticker.id], team: catalog.team(for: sticker.teamCode))
+                StickerTile(
+                    definition: sticker,
+                    owned: ownedByID[sticker.id],
+                    team: catalog.team(for: sticker.teamCode),
+                    onAdd: { add(sticker) },
+                    onRemove: { remove(sticker) }
+                )
             }
         }
     }
@@ -138,8 +155,31 @@ struct CollectionScreen: View {
         return Double(owned) / Double(total)
     }
 
-    private func groupTint(_ groupCode: String) -> Color {
-        catalog.teams.first { $0.groupCode == groupCode }?.accentColor ?? .stickerTeal
+    private func add(_ sticker: StickerDefinition) {
+        do {
+            _ = try CollectionWriter.addSticker(
+                teamCode: sticker.teamCode,
+                number: sticker.number,
+                confidence: nil,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    private func remove(_ sticker: StickerDefinition) {
+        do {
+            _ = try CollectionWriter.removeSticker(
+                teamCode: sticker.teamCode,
+                number: sticker.number,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            editError = error.localizedDescription
+        }
     }
 }
 
@@ -150,18 +190,19 @@ private struct StatPill: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.headline.weight(.black))
+                .font(.headline.weight(.semibold))
                 .monospacedDigit()
+                .foregroundStyle(Color.stickerInk)
             Text(title)
-                .font(.caption.weight(.medium))
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 13)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -169,7 +210,6 @@ private struct StatPill: View {
 private struct GroupFilterChip: View {
     let title: String
     let subtitle: String
-    let tint: Color
     let isSelected: Bool
     let action: () -> Void
 
@@ -177,27 +217,28 @@ private struct GroupFilterChip: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.weight(.bold))
+                    .font(.subheadline.weight(.semibold))
                 Text(subtitle)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.78) : Color.secondary)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.8) : Color.secondary)
             }
-            .frame(width: 94, alignment: .leading)
+            .frame(width: 96, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(chipBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                isSelected ? AnyShapeStyle(Color.stickerTeal) : AnyShapeStyle(Color.cardSurface),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                if !isSelected {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.hairline, lineWidth: 1)
+                }
+            }
             .foregroundStyle(isSelected ? Color.white : Color.stickerInk)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title), \(subtitle)")
-    }
-
-    private var chipBackground: some ShapeStyle {
-        if isSelected {
-            AnyShapeStyle(tint.gradient)
-        } else {
-            AnyShapeStyle(.thinMaterial)
-        }
     }
 }
 

@@ -7,20 +7,33 @@ struct CountryBadge: View {
     var compact = false
 
     var body: some View {
-        HStack(spacing: compact ? 4 : 7) {
-            Text(team?.flag ?? fallbackCode)
-                .font(.system(size: compact ? 15 : 22))
-                .frame(width: compact ? 18 : 28, height: compact ? 18 : 28)
-
-            Text(team?.code ?? fallbackCode)
-                .font(.system(compact ? .caption2 : .subheadline, design: .rounded, weight: .black))
-                .monospaced()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+        if compact {
+            HStack(spacing: 4) {
+                Text(team?.flag ?? fallbackCode)
+                    .font(.system(size: 15))
+                Text(team?.code ?? fallbackCode)
+                    .font(.system(.caption2, design: .rounded, weight: .bold))
+                    .monospaced()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(0.92), in: Capsule())
+            .foregroundStyle(Color.stickerInk)
+            .accessibilityLabel(team?.name ?? fallbackCode)
+        } else {
+            HStack(spacing: 7) {
+                Text(team?.flag ?? fallbackCode)
+                    .font(.system(size: 22))
+                Text(team?.code ?? fallbackCode)
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .monospaced()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(Color.stickerInk)
+            .accessibilityLabel(team?.name ?? fallbackCode)
         }
-        .padding(.horizontal, compact ? 7 : 10)
-        .padding(.vertical, compact ? 5 : 7)
-        .background(.thinMaterial, in: Capsule())
-        .foregroundStyle(Color.stickerInk)
     }
 }

@@ -9,13 +9,13 @@ struct TeamsScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 20) {
                     ForEach(groupSections, id: \.code) { section in
                         TeamGroupSection(section: section)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 18)
+                .padding(.vertical, 20)
             }
             .background(StickerBackdrop())
             .navigationTitle("Teams")
@@ -42,24 +42,24 @@ private struct TeamGroupSection: View {
     let section: TeamGroupProgress
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 12) {
-                Text("Group \(section.code)")
-                    .font(.system(.title3, design: .rounded, weight: .black))
-                Text(section.completion.formatted(.percent.precision(.fractionLength(0))))
-                    .font(.caption.weight(.black))
-                    .monospacedDigit()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.72), in: Capsule())
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Group \(section.code)")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .foregroundStyle(Color.stickerInk)
+                    Text("\(section.ownedUniqueCount) of \(section.totalCount) stickers")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Text("\(section.ownedUniqueCount)/\(section.totalCount)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text(section.completion.formatted(.percent.precision(.fractionLength(0))))
+                    .font(.system(.callout, design: .rounded, weight: .semibold))
                     .monospacedDigit()
+                    .foregroundStyle(Color.stickerTeal)
             }
 
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 ForEach(section.teams) { progress in
                     NavigationLink {
                         TeamDetailScreen(progress: progress)
@@ -72,8 +72,7 @@ private struct TeamGroupSection: View {
             }
         }
         .padding(16)
-        .background(section.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .stickerGlass(cornerRadius: 18)
+        .stickerCard()
     }
 }
 
@@ -85,21 +84,17 @@ private struct TeamProgressRow: View {
         HStack(spacing: 14) {
             CountryBadge(team: progress.team, fallbackCode: progress.team.code)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(progress.team.name)
-                    .font(.headline.weight(.semibold))
+                    .font(.headline)
                     .foregroundStyle(Color.stickerInk)
                     .lineLimit(1)
-                HStack(spacing: 8) {
-                    ProgressView(value: progress.completion)
-                        .tint(progress.team.accentColor)
-                    Text("\(progress.duplicateCount) dupes")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                Text("\(progress.ownedUniqueCount)/\(progress.team.stickerCount) owned")
-                    .font(.caption)
+                ProgressView(value: progress.completion)
+                    .tint(progress.team.accentColor)
+                Text("\(progress.ownedUniqueCount) of \(progress.team.stickerCount) · \(progress.duplicateCount) duplicates")
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
@@ -108,59 +103,82 @@ private struct TeamProgressRow: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(10)
-        .background(.white.opacity(0.58), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.stickerInk.opacity(0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
 @MainActor
 private struct TeamDetailScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(\.modelContext) private var modelContext
     @Query private var ownedStickers: [OwnedSticker]
     let progress: TeamProgress
+    @State private var editError: String?
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 16) {
                     Text(progress.team.flag)
-                        .font(.system(size: 54))
-                        .frame(width: 74, height: 74)
-                        .background(.white.opacity(0.58), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .font(.system(size: 50))
 
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(progress.team.code)
-                            .font(.caption.weight(.black))
-                            .foregroundStyle(.white.opacity(0.82))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.8))
                             .monospaced()
                         Text(progress.team.name)
-                            .font(.system(.title2, design: .rounded, weight: .black))
+                            .font(.system(.title2, design: .rounded, weight: .bold))
                             .foregroundStyle(.white)
                             .lineLimit(2)
                         Text(progress.team.groupTitle)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.82))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.8))
                     }
                     Spacer()
-                    ProgressRing(progress: refreshedProgress.completion, lineWidth: 9)
-                        .frame(width: 78, height: 78)
+                    ProgressRing(
+                        progress: refreshedProgress.completion,
+                        lineWidth: 8,
+                        tint: .white,
+                        labelColor: .white
+                    )
+                    .frame(width: 72, height: 72)
                 }
                 .padding(18)
-                .background(progress.team.accentGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .stickerGlass(cornerRadius: 20)
+                .background(progress.team.accentGradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
                     ForEach(catalog.stickers(for: progress.team.code)) { sticker in
-                        StickerTile(definition: sticker, owned: ownedByID[sticker.id], team: progress.team)
+                        StickerTile(
+                            definition: sticker,
+                            owned: ownedByID[sticker.id],
+                            team: progress.team,
+                            onAdd: { add(sticker) },
+                            onRemove: { remove(sticker) }
+                        )
                     }
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 18)
+            .padding(.vertical, 20)
         }
         .background(StickerBackdrop())
         .navigationTitle(progress.team.name)
         .navigationBarTitleDisplayMode(.inline)
+        .alert(
+            "Could not update sticker",
+            isPresented: Binding(
+                get: { editError != nil },
+                set: { if !$0 { editError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(editError ?? "")
+        }
     }
 
     private var refreshedProgress: TeamProgress {
@@ -169,6 +187,33 @@ private struct TeamDetailScreen: View {
 
     private var ownedByID: [String: OwnedSticker] {
         Dictionary(uniqueKeysWithValues: ownedStickers.map { ($0.stickerID, $0) })
+    }
+
+    private func add(_ sticker: StickerDefinition) {
+        do {
+            _ = try CollectionWriter.addSticker(
+                teamCode: sticker.teamCode,
+                number: sticker.number,
+                confidence: nil,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    private func remove(_ sticker: StickerDefinition) {
+        do {
+            _ = try CollectionWriter.removeSticker(
+                teamCode: sticker.teamCode,
+                number: sticker.number,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            editError = error.localizedDescription
+        }
     }
 }
 

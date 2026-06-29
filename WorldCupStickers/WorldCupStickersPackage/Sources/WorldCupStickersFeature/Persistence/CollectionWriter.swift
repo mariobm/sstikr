@@ -41,4 +41,38 @@ public enum CollectionWriter {
         context.insert(CollectionMutation(stickerID: stickerID, action: .add, quantityDelta: 1))
         return owned
     }
+
+    /// Decrements a sticker's quantity. Removes the owned record when it reaches 0.
+    /// Returns the resulting quantity (0 when the sticker is no longer owned).
+    @discardableResult
+    public static func removeSticker(
+        teamCode: String,
+        number: Int,
+        catalog: StickerCatalogStore,
+        context: ModelContext
+    ) throws -> Int {
+        guard let definition = catalog.sticker(teamCode: teamCode, number: number) else {
+            return 0
+        }
+
+        let stickerID = definition.id
+        let descriptor = FetchDescriptor<OwnedSticker>(
+            predicate: #Predicate { sticker in
+                sticker.stickerID == stickerID
+            }
+        )
+
+        guard let existing = try context.fetch(descriptor).first else { return 0 }
+
+        existing.quantity -= 1
+        existing.updatedAt = Date()
+        existing.syncState = .pendingUpload
+        context.insert(CollectionMutation(stickerID: stickerID, action: .decrement, quantityDelta: -1))
+
+        if existing.quantity <= 0 {
+            context.delete(existing)
+            return 0
+        }
+        return existing.quantity
+    }
 }
