@@ -89,7 +89,7 @@ struct StickerTile: View {
     @ViewBuilder
     private var tileArtwork: some View {
         if quantity > 0 {
-            AsyncImage(url: definition.imageURL) { phase in
+            CachedAsyncImage(url: definition.imageURL) { phase in
                 switch phase {
                 case .success(let image):
                     image

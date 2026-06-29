@@ -8,7 +8,6 @@ struct ScannerScreen: View {
     @State private var scanner = CameraScanner()
     @State private var pendingScan: StickerScanResult?
     @State private var addMessage: String?
-    @State private var focusLocation: CGPoint?
 
     var body: some View {
         NavigationStack {
@@ -19,11 +18,19 @@ struct ScannerScreen: View {
             .navigationTitle("Scan")
             .navigationBarTitleDisplayMode(.inline)
             .task {
+                scanner.updateCatalog(stickers: catalog.stickers)
                 await scanner.configure()
+                scanner.start()
+            }
+            .onAppear {
+                scanner.resetForScreenEntry()
                 scanner.start()
             }
             .onDisappear {
                 scanner.stop()
+            }
+            .onChange(of: catalog.stickers.count, initial: true) { _, _ in
+                scanner.updateCatalog(stickers: catalog.stickers)
             }
             .onChange(of: scanner.stableResult) { _, result in
                 guard let result else { return }
@@ -38,7 +45,8 @@ struct ScannerScreen: View {
                     teamCode: result.teamCode,
                     number: result.number,
                     rawText: result.rawText,
-                    confidence: 1
+                    confidence: 1,
+                    scanMode: result.scanMode
                 )
                 scanner.pauseDetections()
             }
@@ -57,10 +65,7 @@ struct ScannerScreen: View {
     private var scannerContent: some View {
         switch scanner.authorizationState {
         case .authorized:
-            CameraPreview(session: scanner.session) { devicePoint, viewPoint in
-                focusLocation = viewPoint
-                scanner.focus(at: devicePoint)
-            }
+            CameraPreview(session: scanner.session)
                 .ignoresSafeArea()
                 .accessibilityIdentifier("cameraPreview")
         case .notDetermined:
@@ -69,7 +74,7 @@ struct ScannerScreen: View {
             ContentUnavailableView(
                 "Camera Access Needed",
                 systemImage: "camera.badge.ellipsis",
-                description: Text("Enable camera access in Settings to scan sticker backs.")
+                description: Text("Enable camera access in Settings to scan stickers.")
             )
         case .unavailable:
             ContentUnavailableView(
@@ -82,7 +87,16 @@ struct ScannerScreen: View {
 
     private var scannerOverlay: some View {
         VStack {
-            HStack {
+            HStack(spacing: 12) {
+                Picker("Scan side", selection: scanModeBinding) {
+                    ForEach(StickerScanMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 248)
+                .stickerGlass(cornerRadius: 16)
+
                 Spacer()
                 Button {
                     scanner.switchToNextLens()
@@ -104,18 +118,7 @@ struct ScannerScreen: View {
 
             Spacer()
             VStack(spacing: 16) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(.white.opacity(0.94), style: StrokeStyle(lineWidth: 3, dash: [14, 8]))
-                    .overlay(alignment: .topTrailing) {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.stickerOrange, lineWidth: 4)
-                            .frame(width: 130, height: 58)
-                            .padding(.top, 22)
-                            .padding(.trailing, 18)
-                    }
-                    .frame(maxWidth: 330, maxHeight: 470)
-                    .aspectRatio(0.68, contentMode: .fit)
-                    .accessibilityHidden(true)
+                scanGuide
 
                 VStack(spacing: 6) {
                     Text(scanner.statusMessage)
@@ -125,7 +128,7 @@ struct ScannerScreen: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("Only the upper-right badge is read.")
+                        Text(targetMessage)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -142,11 +145,57 @@ struct ScannerScreen: View {
             }
             .padding()
         }
-        .overlay(alignment: .topLeading) {
-            if let focusLocation {
-                FocusReticle()
-                    .position(focusLocation)
-                    .allowsHitTesting(false)
+    }
+
+    private var scanModeBinding: Binding<StickerScanMode> {
+        Binding {
+            scanner.scanMode
+        } set: { mode in
+            scanner.setScanMode(mode)
+        }
+    }
+
+    private var targetMessage: String {
+        if scanner.scanMode == .auto {
+            return scanner.activeScanMode.targetMessage
+        }
+
+        return scanner.scanMode.targetMessage
+    }
+
+    private var scanGuide: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .stroke(.white.opacity(0.94), style: StrokeStyle(lineWidth: 3, dash: [14, 8]))
+            .overlay {
+                scanTargetOverlay
+            }
+            .frame(maxWidth: 330, maxHeight: 470)
+            .aspectRatio(0.68, contentMode: .fit)
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var scanTargetOverlay: some View {
+        switch scanner.activeScanMode {
+        case .auto, .back:
+            VStack {
+                HStack {
+                    Spacer()
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.stickerOrange, lineWidth: 4)
+                        .frame(width: 130, height: 58)
+                        .padding(.top, 22)
+                        .padding(.trailing, 18)
+                }
+                Spacer()
+            }
+        case .front:
+            VStack {
+                Spacer()
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.stickerOrange, lineWidth: 4)
+                    .frame(width: 242, height: 82)
+                    .padding(.bottom, 42)
             }
         }
     }
@@ -167,17 +216,6 @@ struct ScannerScreen: View {
         } catch {
             addMessage = "Could not save sticker."
         }
-    }
-}
-
-@MainActor
-private struct FocusReticle: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .stroke(Color.stickerOrange, lineWidth: 2)
-            .frame(width: 72, height: 72)
-            .shadow(color: .black.opacity(0.24), radius: 8, y: 3)
-            .accessibilityHidden(true)
     }
 }
 

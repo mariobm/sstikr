@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 
-CATALOG_VERSION = "2026.06.28-final"
+CATALOG_VERSION = "2026.06.29-avif"
 DEFAULT_BUCKET = "world-cup-stickers"
 COUNTRY_RE = re.compile(r"^[A-Z]{3}$")
 
@@ -134,13 +134,13 @@ def category(code: str, number: str, title: str) -> str:
 
 def object_key(code: str, number: str) -> str:
     if code == "00":
-        return "stickers-new/00.jpg"
+        return "stickers-new/00.avif"
     numeric = int(number)
-    return f"stickers-new/{code}/{code}-{numeric}.jpg"
+    return f"stickers-new/{code}/{code}-{numeric}.avif"
 
 
 def source_path(row: dict[str, str]) -> str:
-    return row["destination"]
+    return str(Path(row["destination"]).with_suffix(".avif"))
 
 
 def collect_team_names(rows: list[dict[str, str]]) -> dict[str, str]:
@@ -317,7 +317,7 @@ def write_upload_manifest(path: Path, rows: list[dict[str, str]], bucket: str) -
                     "bucket": bucket,
                     "object_key": object_key(code, number),
                     "source_path": str(source),
-                    "content_type": "image/jpeg",
+                    "content_type": "image/avif",
                     "bytes": source.stat().st_size,
                 }
             )

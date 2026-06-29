@@ -20,5 +20,5 @@ The app is local-first. Offline scans create local mutation records first; once 
 ## Sticker Images
 
 `public.sticker_catalog.image_path` stores the R2 object key, for example
-`stickers-new/MEX/MEX-1.jpg`. `image_url` is nullable until the R2 bucket has a
+`stickers-new/MEX/MEX-1.avif`. `image_url` is nullable until the R2 bucket has a
 public `r2.dev` URL or a production custom domain.

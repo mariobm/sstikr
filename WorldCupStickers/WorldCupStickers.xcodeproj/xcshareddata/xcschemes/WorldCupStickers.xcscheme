@@ -30,9 +30,6 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:WorldCupStickers.xctestplan">
-         </TestPlanReference>
-         <TestPlanReference
             reference = "container:WorldCupStickers/WorldCupStickers.xctestplan"
             default = "YES">
          </TestPlanReference>
