@@ -5,6 +5,7 @@ struct StickerTile: View {
     let definition: StickerDefinition
     let owned: OwnedSticker?
     let team: TeamDefinition?
+    let index: Int
     let onAdd: () -> Void
     let onRemove: () -> Void
 
@@ -12,12 +13,14 @@ struct StickerTile: View {
         definition: StickerDefinition,
         owned: OwnedSticker?,
         team: TeamDefinition? = nil,
+        index: Int = 0,
         onAdd: @escaping () -> Void,
         onRemove: @escaping () -> Void
     ) {
         self.definition = definition
         self.owned = owned
         self.team = team
+        self.index = index
         self.onAdd = onAdd
         self.onRemove = onRemove
     }
@@ -82,6 +85,7 @@ struct StickerTile: View {
             }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: quantity)
+        .animation(.bouncy(duration: 0.45).delay(Double(index) * 0.015), value: quantity)
         .accessibilityLabel("\(definition.displayCode), \(accessibilityState)")
         .accessibilityIdentifier("stickerTile_\(definition.id)")
     }

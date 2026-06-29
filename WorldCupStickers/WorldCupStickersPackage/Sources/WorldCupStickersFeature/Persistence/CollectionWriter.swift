@@ -75,4 +75,64 @@ public enum CollectionWriter {
         }
         return existing.quantity
     }
+
+    /// Adds every missing sticker for a team. Stickers already owned keep their quantity.
+    /// Returns the number of newly added stickers.
+    @discardableResult
+    public static func setAllOwned(
+        forTeam teamCode: String,
+        catalog: StickerCatalogStore,
+        context: ModelContext
+    ) throws -> Int {
+        let stickers = catalog.stickers(for: teamCode)
+        var added = 0
+
+        for sticker in stickers {
+            let stickerID = sticker.id
+            let descriptor = FetchDescriptor<OwnedSticker>(
+                predicate: #Predicate { owned in
+                    owned.stickerID == stickerID
+                }
+            )
+
+            if try context.fetch(descriptor).first == nil {
+                let owned = OwnedSticker(
+                    stickerID: sticker.id,
+                    teamCode: sticker.teamCode,
+                    number: sticker.number
+                )
+                context.insert(owned)
+                context.insert(CollectionMutation(stickerID: sticker.id, action: .add, quantityDelta: 1))
+                added += 1
+            }
+        }
+        return added
+    }
+
+    /// Removes every owned sticker for a team.
+    /// Returns the number of stickers that were removed.
+    @discardableResult
+    public static func removeAll(
+        forTeam teamCode: String,
+        catalog: StickerCatalogStore,
+        context: ModelContext
+    ) throws -> Int {
+        let upperCode = teamCode.uppercased()
+        let descriptor = FetchDescriptor<OwnedSticker>(
+            predicate: #Predicate { owned in
+                owned.teamCode == upperCode
+            }
+        )
+
+        let owned = try context.fetch(descriptor)
+        for sticker in owned {
+            context.insert(CollectionMutation(
+                stickerID: sticker.stickerID,
+                action: .decrement,
+                quantityDelta: -sticker.quantity
+            ))
+            context.delete(sticker)
+        }
+        return owned.count
+    }
 }

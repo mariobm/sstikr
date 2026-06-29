@@ -10,6 +10,8 @@ struct CollectionScreen: View {
     @State private var filter: CollectionFilter = .all
     @State private var selectedGroup: String?
     @State private var editError: String?
+    @State private var splashTeamCode: String?
+    @State private var hasInitializedCompletionTracking = false
 
     var body: some View {
         NavigationStack {
@@ -25,6 +27,7 @@ struct CollectionScreen: View {
             }
             .background(StickerBackdrop())
             .navigationTitle("Collection")
+            .toolbar(splashTeamCode != nil ? .hidden : .automatic, for: .navigationBar)
             .searchable(text: $searchText, prompt: "Search team, player, or code")
             .alert(
                 "Could not update sticker",
@@ -36,6 +39,26 @@ struct CollectionScreen: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(editError ?? "")
+            }
+            .overlay {
+                if let teamCode = splashTeamCode,
+                   let team = catalog.team(for: teamCode) {
+                    TeamCompletionSplash(
+                        team: team,
+                        sticker: catalog.sticker(teamCode: teamCode, number: 1),
+                        onDismiss: { splashTeamCode = nil }
+                    )
+                    .transition(.opacity)
+                }
+            }
+            .onChange(of: completeTeamCodes) { previous, current in
+                guard hasInitializedCompletionTracking else {
+                    hasInitializedCompletionTracking = true
+                    return
+                }
+                if let teamCode = current.subtracting(previous).first {
+                    splashTeamCode = teamCode
+                }
             }
         }
     }
@@ -113,11 +136,12 @@ struct CollectionScreen: View {
 
     private var stickerGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
-            ForEach(filteredStickers) { sticker in
+            ForEach(Array(filteredStickers.enumerated()), id: \.element.id) { index, sticker in
                 StickerTile(
                     definition: sticker,
                     owned: ownedByID[sticker.id],
                     team: catalog.team(for: sticker.teamCode),
+                    index: index,
                     onAdd: { add(sticker) },
                     onRemove: { remove(sticker) }
                 )
@@ -141,6 +165,14 @@ struct CollectionScreen: View {
 
     private var ownedByID: [String: OwnedSticker] {
         Dictionary(uniqueKeysWithValues: ownedStickers.map { ($0.stickerID, $0) })
+    }
+
+    private var completeTeamCodes: Set<String> {
+        Set(
+            catalog.progressByTeam(for: ownedStickers)
+                .filter { $0.ownedUniqueCount >= $0.team.stickerCount }
+                .map(\.team.code)
+        )
     }
 
     private var groupCodes: [String] {

@@ -117,6 +117,24 @@ private struct TeamDetailScreen: View {
     @Query private var ownedStickers: [OwnedSticker]
     let progress: TeamProgress
     @State private var editError: String?
+    @State private var confirmingRemoveAll = false
+    @State private var showSplash = false
+
+    private var refreshedProgress: TeamProgress {
+        catalog.progressByTeam(for: ownedStickers).first { $0.team.code == progress.team.code } ?? progress
+    }
+
+    private var allOwned: Bool {
+        refreshedProgress.ownedUniqueCount >= progress.team.stickerCount
+    }
+
+    private var noneOwned: Bool {
+        refreshedProgress.ownedUniqueCount == 0
+    }
+
+    private var stickerNumber1: StickerDefinition? {
+        catalog.stickers(for: progress.team.code).first(where: { $0.number == 1 })
+    }
 
     var body: some View {
         ScrollView {
@@ -151,11 +169,12 @@ private struct TeamDetailScreen: View {
                 .background(progress.team.accentGradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
-                    ForEach(catalog.stickers(for: progress.team.code)) { sticker in
+                    ForEach(Array(catalog.stickers(for: progress.team.code).enumerated()), id: \.element.id) { index, sticker in
                         StickerTile(
                             definition: sticker,
                             owned: ownedByID[sticker.id],
                             team: progress.team,
+                            index: index,
                             onAdd: { add(sticker) },
                             onRemove: { remove(sticker) }
                         )
@@ -168,8 +187,43 @@ private struct TeamDetailScreen: View {
         .background(StickerBackdrop())
         .navigationTitle(progress.team.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(showSplash ? .hidden : .automatic, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        markAllOwned()
+                    } label: {
+                        Label("Mark all as owned", systemImage: "checkmark.circle.fill")
+                    }
+                    .disabled(allOwned)
+
+                    Button(role: .destructive) {
+                        confirmingRemoveAll = true
+                    } label: {
+                        Label("Remove all", systemImage: "trash")
+                    }
+                    .disabled(noneOwned)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel("Bulk actions for \(progress.team.name)")
+            }
+        }
+        .confirmationDialog(
+            "Remove all \(progress.team.name) stickers?",
+            isPresented: $confirmingRemoveAll,
+            titleVisibility: .visible
+        ) {
+            Button("Remove all", role: .destructive) {
+                removeAllOwned()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes all \(refreshedProgress.ownedUniqueCount) stickers from your collection for \(progress.team.name). You can re-add them individually.")
+        }
         .alert(
-            "Could not update sticker",
+            "Could not update stickers",
             isPresented: Binding(
                 get: { editError != nil },
                 set: { if !$0 { editError = nil } }
@@ -179,10 +233,21 @@ private struct TeamDetailScreen: View {
         } message: {
             Text(editError ?? "")
         }
-    }
-
-    private var refreshedProgress: TeamProgress {
-        catalog.progressByTeam(for: ownedStickers).first { $0.team.code == progress.team.code } ?? progress
+        .overlay {
+            if showSplash {
+                TeamCompletionSplash(
+                    team: progress.team,
+                    sticker: stickerNumber1,
+                    onDismiss: { showSplash = false }
+                )
+                .transition(.opacity)
+            }
+        }
+        .onChange(of: allOwned) { wasComplete, nowComplete in
+            if !wasComplete && nowComplete {
+                showSplash = true
+            }
+        }
     }
 
     private var ownedByID: [String: OwnedSticker] {
@@ -208,6 +273,30 @@ private struct TeamDetailScreen: View {
             _ = try CollectionWriter.removeSticker(
                 teamCode: sticker.teamCode,
                 number: sticker.number,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    private func markAllOwned() {
+        do {
+            _ = try CollectionWriter.setAllOwned(
+                forTeam: progress.team.code,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    private func removeAllOwned() {
+        do {
+            _ = try CollectionWriter.removeAll(
+                forTeam: progress.team.code,
                 catalog: catalog,
                 context: modelContext
             )
