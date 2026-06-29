@@ -22,23 +22,39 @@ public enum CollectionWriter {
             }
         )
 
-        if let existing = try context.fetch(descriptor).first {
+        let existing = try context.fetch(descriptor).first
+        return addSticker(
+            definition: definition,
+            existing: existing,
+            confidence: confidence,
+            context: context
+        )
+    }
+
+    @discardableResult
+    public static func addSticker(
+        definition: StickerDefinition,
+        existing: OwnedSticker?,
+        confidence: Double?,
+        context: ModelContext
+    ) -> OwnedSticker {
+        if let existing {
             existing.quantity += 1
             existing.updatedAt = Date()
             existing.lastScanConfidence = confidence
             existing.syncState = .pendingUpload
-            context.insert(CollectionMutation(stickerID: stickerID, action: .add, quantityDelta: 1))
+            context.insert(CollectionMutation(stickerID: definition.id, action: .add, quantityDelta: 1))
             return existing
         }
 
         let owned = OwnedSticker(
-            stickerID: stickerID,
+            stickerID: definition.id,
             teamCode: definition.teamCode,
             number: definition.number,
             lastScanConfidence: confidence
         )
         context.insert(owned)
-        context.insert(CollectionMutation(stickerID: stickerID, action: .add, quantityDelta: 1))
+        context.insert(CollectionMutation(stickerID: definition.id, action: .add, quantityDelta: 1))
         return owned
     }
 
@@ -63,11 +79,21 @@ public enum CollectionWriter {
         )
 
         guard let existing = try context.fetch(descriptor).first else { return 0 }
+        return removeSticker(definition: definition, existing: existing, context: context)
+    }
+
+    @discardableResult
+    public static func removeSticker(
+        definition: StickerDefinition,
+        existing: OwnedSticker?,
+        context: ModelContext
+    ) -> Int {
+        guard let existing else { return 0 }
 
         existing.quantity -= 1
         existing.updatedAt = Date()
         existing.syncState = .pendingUpload
-        context.insert(CollectionMutation(stickerID: stickerID, action: .decrement, quantityDelta: -1))
+        context.insert(CollectionMutation(stickerID: definition.id, action: .decrement, quantityDelta: -1))
 
         if existing.quantity <= 0 {
             context.delete(existing)

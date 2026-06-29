@@ -4,10 +4,14 @@ import SwiftUI
 @MainActor
 struct ScannerScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(SyncStatusStore.self) private var syncStatus
     @Environment(\.modelContext) private var modelContext
+    @Query private var ownedStickers: [OwnedSticker]
     @State private var scanner = CameraScanner()
     @State private var pendingScan: StickerScanResult?
     @State private var addMessage: String?
+    @State private var recentScans: [String] = []
+    @State private var fastAddTrigger = 0
 
     var body: some View {
         NavigationStack {
@@ -15,6 +19,7 @@ struct ScannerScreen: View {
                 scannerContent
                 scannerOverlay
             }
+            .sensoryFeedback(.success, trigger: fastAddTrigger)
             .navigationTitle("Scan")
             .navigationBarTitleDisplayMode(.inline)
             .task {
@@ -34,21 +39,34 @@ struct ScannerScreen: View {
             }
             .onChange(of: scanner.stableResult) { _, result in
                 guard let result else { return }
-                guard catalog.sticker(teamCode: result.teamCode, number: result.number) != nil else {
+                guard let definition = catalog.sticker(teamCode: result.teamCode, number: result.number) else {
                     scanner.discardStableResult(
                         message: "\(result.displayCode) is not in the catalog. Scanning again."
                     )
                     return
                 }
 
-                pendingScan = StickerScanResult(
-                    teamCode: result.teamCode,
-                    number: result.number,
-                    rawText: result.rawText,
-                    confidence: 1,
-                    scanMode: result.scanMode
-                )
-                scanner.pauseDetections()
+                if recentScans.contains(definition.id) {
+                    scanner.discardStableResult(
+                        message: "Already scanned \(definition.displayCode). Looking for the next sticker."
+                    )
+                    return
+                }
+
+                let isDuplicate = ownedByID[definition.id]?.quantity ?? 0 > 0
+
+                if syncStatus.fastMode && !isDuplicate {
+                    addStickerDirectly(definition, result: result)
+                } else {
+                    pendingScan = StickerScanResult(
+                        teamCode: result.teamCode,
+                        number: result.number,
+                        rawText: result.rawText,
+                        confidence: 1,
+                        scanMode: result.scanMode
+                    )
+                    scanner.pauseDetections()
+                }
             }
             .sheet(item: $pendingScan, onDismiss: {
                 scanner.resumeDetections()
@@ -87,16 +105,7 @@ struct ScannerScreen: View {
 
     private var scannerOverlay: some View {
         VStack {
-            HStack(spacing: 12) {
-                Picker("Scan side", selection: scanModeBinding) {
-                    ForEach(StickerScanMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 248)
-                .stickerGlass(cornerRadius: 16)
-
+            HStack {
                 Spacer()
                 Button {
                     scanner.switchToNextLens()
@@ -128,15 +137,16 @@ struct ScannerScreen: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text(targetMessage)
+                        Text("Align the sticker inside the guide.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
 
                     if let addMessage {
-                        Text(addMessage)
-                            .font(.caption.weight(.semibold))
+                        Label(addMessage, systemImage: "checkmark.circle.fill")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.stickerTeal)
+                            .transition(.scale.combined(with: .opacity))
                     }
                 }
                 .multilineTextAlignment(.center)
@@ -145,22 +155,17 @@ struct ScannerScreen: View {
             }
             .padding()
         }
-    }
-
-    private var scanModeBinding: Binding<StickerScanMode> {
-        Binding {
-            scanner.scanMode
-        } set: { mode in
-            scanner.setScanMode(mode)
+        .task(id: addMessage) {
+            guard addMessage != nil else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            withAnimation(.easeOut(duration: 0.4)) {
+                addMessage = nil
+            }
         }
     }
 
-    private var targetMessage: String {
-        if scanner.scanMode == .auto {
-            return scanner.activeScanMode.targetMessage
-        }
-
-        return scanner.scanMode.targetMessage
+    private var ownedByID: [String: OwnedSticker] {
+        Dictionary(uniqueKeysWithValues: ownedStickers.map { ($0.stickerID, $0) })
     }
 
     private var scanGuide: some View {
@@ -202,14 +207,17 @@ struct ScannerScreen: View {
 
     private func addSticker(teamCode: String, number: Int, confidence: Double?) {
         do {
-            if let owned = try CollectionWriter.addSticker(
+            if try CollectionWriter.addSticker(
                 teamCode: teamCode,
                 number: number,
                 confidence: confidence,
                 catalog: catalog,
                 context: modelContext
-            ) {
-                addMessage = "\(owned.teamCode) \(owned.number) saved. Quantity: \(owned.quantity)."
+            ) != nil {
+                let definition = catalog.sticker(teamCode: teamCode, number: number)
+                let label = definition?.name ?? "\(teamCode.uppercased())-\(number)"
+                addMessage = "Added \(label)"
+                if let id = definition?.id { recordRecentScan(id) }
             } else {
                 addMessage = "\(teamCode) \(number) is not in the catalog."
             }
@@ -217,11 +225,41 @@ struct ScannerScreen: View {
             addMessage = "Could not save sticker."
         }
     }
+
+    private func addStickerDirectly(_ definition: StickerDefinition, result: StickerScanResult) {
+        do {
+            _ = try CollectionWriter.addSticker(
+                teamCode: definition.teamCode,
+                number: definition.number,
+                confidence: result.confidence,
+                catalog: catalog,
+                context: modelContext
+            )
+            let label = definition.name.isEmpty ? definition.displayCode : definition.name
+            withAnimation {
+                addMessage = "Added \(label)"
+            }
+            fastAddTrigger += 1
+            recordRecentScan(definition.id)
+            scanner.discardStableResult(message: "Ready for the next scan.")
+        } catch {
+            addMessage = "Could not save sticker."
+        }
+    }
+
+    private func recordRecentScan(_ stickerID: String) {
+        recentScans.append(stickerID)
+        let maxSize = max(syncStatus.recentScanBufferSize, 1)
+        if recentScans.count > maxSize {
+            recentScans.removeFirst(recentScans.count - maxSize)
+        }
+    }
 }
 
 @MainActor
 private struct ScanConfirmationSheet: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Query private var ownedStickers: [OwnedSticker]
     let result: StickerScanResult
     let onAdd: (String, Int, Double?) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -235,12 +273,35 @@ private struct ScanConfirmationSheet: View {
         _numberText = State(initialValue: "\(result.number)")
     }
 
+    private var detectedDefinition: StickerDefinition? {
+        catalog.sticker(teamCode: result.teamCode, number: result.number)
+    }
+
+    private var detectedTeam: TeamDefinition? {
+        guard let definition = detectedDefinition else { return nil }
+        return catalog.team(for: definition.teamCode)
+    }
+
+    private var editedDefinition: StickerDefinition? {
+        guard let number = Int(numberText) else { return nil }
+        return catalog.sticker(teamCode: teamCode, number: number)
+    }
+
+    private var duplicateQuantity: Int {
+        guard let definition = editedDefinition ?? detectedDefinition else { return 0 }
+        return ownedByID[definition.id]?.quantity ?? 0
+    }
+
+    private var ownedByID: [String: OwnedSticker] {
+        Dictionary(uniqueKeysWithValues: ownedStickers.map { ($0.stickerID, $0) })
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Detected") {
-                    if let definition = catalog.sticker(teamCode: result.teamCode, number: result.number),
-                       let team = catalog.team(for: definition.teamCode) {
+                    if let definition = detectedDefinition,
+                       let team = detectedTeam {
                         HStack(spacing: 12) {
                             CountryBadge(team: team, fallbackCode: definition.teamCode)
                             VStack(alignment: .leading, spacing: 3) {
@@ -251,13 +312,15 @@ private struct ScanConfirmationSheet: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+
+                        stickerImage(definition)
                     }
 
                     HStack {
                         Text("Code")
                         Spacer()
                         Text(result.displayCode)
-                            .font(.title3.weight(.black))
+                            .font(.title3.weight(.bold))
                             .monospacedDigit()
                     }
                     HStack {
@@ -274,6 +337,8 @@ private struct ScanConfirmationSheet: View {
                         .autocorrectionDisabled()
                     TextField("Number", text: $numberText)
                         .keyboardType(.numberPad)
+
+                    duplicateBadge
                 }
 
                 if let definition = editedDefinition,
@@ -282,7 +347,7 @@ private struct ScanConfirmationSheet: View {
                         Label("\(team.name) - \(definition.displayCode)", systemImage: "checkmark.seal.fill")
                             .foregroundStyle(Color.stickerTeal)
                     }
-                } else {
+                } else if editedDefinition == nil && !teamCode.isEmpty {
                     Section("Match") {
                         Label("No catalog match", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(Color.stickerOrange)
@@ -310,8 +375,41 @@ private struct ScanConfirmationSheet: View {
         }
     }
 
-    private var editedDefinition: StickerDefinition? {
-        guard let number = Int(numberText) else { return nil }
-        return catalog.sticker(teamCode: teamCode, number: number)
+    @ViewBuilder
+    private func stickerImage(_ definition: StickerDefinition) -> some View {
+        AsyncImage(url: definition.imageURL) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            case .failure:
+                EmptyView()
+            case .empty:
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            @unknown default:
+                EmptyView()
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var duplicateBadge: some View {
+        if editedDefinition != nil {
+            if duplicateQuantity > 0 {
+                Label("Duplicate — you have \(duplicateQuantity)", systemImage: "square.stack.3d.up.fill")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.stickerOrange)
+            } else {
+                Label("New sticker", systemImage: "sparkles")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.stickerTeal)
+            }
+        }
     }
 }

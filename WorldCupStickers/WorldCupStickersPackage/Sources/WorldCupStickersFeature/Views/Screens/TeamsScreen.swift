@@ -53,7 +53,7 @@ private struct TeamGroupSection: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(section.completion.formatted(.percent.precision(.fractionLength(0))))
+                Text("\(section.ownedUniqueCount)/\(section.totalCount)")
                     .font(.system(.callout, design: .rounded, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(Color.stickerTeal)
@@ -105,7 +105,7 @@ private struct TeamProgressRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.stickerInk.opacity(0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.stickerInk.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
@@ -137,6 +137,8 @@ private struct TeamDetailScreen: View {
     }
 
     var body: some View {
+        let ownershipByID = ownedByID
+
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 16) {
@@ -161,7 +163,8 @@ private struct TeamDetailScreen: View {
                         progress: refreshedProgress.completion,
                         lineWidth: 8,
                         tint: .white,
-                        labelColor: .white
+                        labelColor: .white,
+                        label: "\(refreshedProgress.ownedUniqueCount)/\(progress.team.stickerCount)"
                     )
                     .frame(width: 72, height: 72)
                 }
@@ -170,15 +173,21 @@ private struct TeamDetailScreen: View {
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
                     ForEach(Array(catalog.stickers(for: progress.team.code).enumerated()), id: \.element.id) { index, sticker in
+                        let owned = ownershipByID[sticker.id]
+
                         StickerTile(
                             definition: sticker,
-                            owned: ownedByID[sticker.id],
+                            owned: owned,
                             team: progress.team,
                             index: index,
-                            onAdd: { add(sticker) },
-                            onRemove: { remove(sticker) }
+                            onAdd: { add(sticker, existing: owned) },
+                            onRemove: { remove(sticker, existing: owned) }
                         )
                     }
+                }
+                .transaction { transaction in
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
                 }
             }
             .padding(.horizontal, 16)
@@ -254,30 +263,32 @@ private struct TeamDetailScreen: View {
         Dictionary(uniqueKeysWithValues: ownedStickers.map { ($0.stickerID, $0) })
     }
 
-    private func add(_ sticker: StickerDefinition) {
-        do {
-            _ = try CollectionWriter.addSticker(
-                teamCode: sticker.teamCode,
-                number: sticker.number,
+    private func add(_ sticker: StickerDefinition, existing: OwnedSticker?) {
+        performInstantEdit {
+            _ = CollectionWriter.addSticker(
+                definition: sticker,
+                existing: existing,
                 confidence: nil,
-                catalog: catalog,
                 context: modelContext
             )
-        } catch {
-            editError = error.localizedDescription
         }
     }
 
-    private func remove(_ sticker: StickerDefinition) {
-        do {
-            _ = try CollectionWriter.removeSticker(
-                teamCode: sticker.teamCode,
-                number: sticker.number,
-                catalog: catalog,
+    private func remove(_ sticker: StickerDefinition, existing: OwnedSticker?) {
+        performInstantEdit {
+            _ = CollectionWriter.removeSticker(
+                definition: sticker,
+                existing: existing,
                 context: modelContext
             )
-        } catch {
-            editError = error.localizedDescription
+        }
+    }
+
+    private func performInstantEdit(_ edit: () -> Void) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            edit()
         }
     }
 

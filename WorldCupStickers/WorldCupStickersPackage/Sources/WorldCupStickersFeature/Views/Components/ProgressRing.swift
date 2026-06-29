@@ -6,6 +6,7 @@ struct ProgressRing: View {
     let lineWidth: CGFloat
     var tint: Color = .stickerTeal
     var labelColor: Color = .stickerInk
+    var label: String? = nil
 
     var body: some View {
         ZStack {
@@ -18,12 +19,12 @@ struct ProgressRing: View {
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-            Text(progress.formatted(.percent.precision(.fractionLength(0))))
+            Text(label ?? progress.formatted(.percent.precision(.fractionLength(0))))
                 .font(.caption.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(labelColor)
         }
         .accessibilityLabel("Completion")
-        .accessibilityValue(progress.formatted(.percent.precision(.fractionLength(0))))
+        .accessibilityValue(label ?? progress.formatted(.percent.precision(.fractionLength(0))))
     }
 }

@@ -76,15 +76,24 @@ public final class StickerCatalogStore {
     }
 
     public func progressByTeam(for ownedStickers: [OwnedSticker]) -> [TeamProgress] {
-        teams.map { team in
-            let teamOwned = ownedStickers.filter { $0.teamCode == team.code && $0.quantity > 0 }
-            let duplicateCount = teamOwned.reduce(0) { $0 + max($1.quantity - 1, 0) }
+        var countsByTeam: [String: (ownedUniqueCount: Int, duplicateCount: Int)] = [:]
+
+        for sticker in ownedStickers where sticker.quantity > 0 {
+            let current = countsByTeam[sticker.teamCode] ?? (ownedUniqueCount: 0, duplicateCount: 0)
+            countsByTeam[sticker.teamCode] = (
+                ownedUniqueCount: current.ownedUniqueCount + 1,
+                duplicateCount: current.duplicateCount + max(sticker.quantity - 1, 0)
+            )
+        }
+
+        return teams.map { team in
+            let counts = countsByTeam[team.code] ?? (ownedUniqueCount: 0, duplicateCount: 0)
 
             return TeamProgress(
                 id: team.code,
                 team: team,
-                ownedUniqueCount: teamOwned.count,
-                duplicateCount: duplicateCount
+                ownedUniqueCount: counts.ownedUniqueCount,
+                duplicateCount: counts.duplicateCount
             )
         }
     }

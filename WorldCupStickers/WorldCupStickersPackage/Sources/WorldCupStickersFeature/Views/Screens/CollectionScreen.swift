@@ -98,7 +98,9 @@ struct CollectionScreen: View {
     }
 
     private var groupStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        let progressByGroup = groupProgressByGroup()
+
+        return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 GroupFilterChip(
                     title: "All",
@@ -109,10 +111,9 @@ struct CollectionScreen: View {
                 }
 
                 ForEach(groupCodes, id: \.self) { groupCode in
-                    let progress = groupProgress(groupCode)
                     GroupFilterChip(
                         title: "Group \(groupCode)",
-                        subtitle: progress.formatted(.percent.precision(.fractionLength(0))),
+                        subtitle: (progressByGroup[groupCode] ?? 0).formatted(.percent.precision(.fractionLength(0))),
                         isSelected: selectedGroup == groupCode
                     ) {
                         selectedGroup = groupCode
@@ -135,21 +136,30 @@ struct CollectionScreen: View {
     }
 
     private var stickerGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
-            ForEach(Array(filteredStickers.enumerated()), id: \.element.id) { index, sticker in
+        let ownershipByID = ownedByID
+        let stickers = filteredStickers(ownedByID: ownershipByID)
+
+        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 126), spacing: 14)], spacing: 14) {
+            ForEach(Array(stickers.enumerated()), id: \.element.id) { index, sticker in
+                let owned = ownershipByID[sticker.id]
+
                 StickerTile(
                     definition: sticker,
-                    owned: ownedByID[sticker.id],
+                    owned: owned,
                     team: catalog.team(for: sticker.teamCode),
                     index: index,
-                    onAdd: { add(sticker) },
-                    onRemove: { remove(sticker) }
+                    onAdd: { add(sticker, existing: owned) },
+                    onRemove: { remove(sticker, existing: owned) }
                 )
             }
         }
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 
-    private var filteredStickers: [StickerDefinition] {
+    private func filteredStickers(ownedByID: [String: OwnedSticker]) -> [StickerDefinition] {
         catalog.stickers.filter { sticker in
             guard let team = catalog.team(for: sticker.teamCode) else { return false }
             let owned = ownedByID[sticker.id]
@@ -179,38 +189,44 @@ struct CollectionScreen: View {
         Array(Set(catalog.teams.map(\.groupCode))).sorted()
     }
 
-    private func groupProgress(_ groupCode: String) -> Double {
-        let progress = catalog.progressByTeam(for: ownedStickers).filter { $0.team.groupCode == groupCode }
-        let total = progress.reduce(0) { $0 + $1.team.stickerCount }
-        guard total > 0 else { return 0 }
-        let owned = progress.reduce(0) { $0 + $1.ownedUniqueCount }
-        return Double(owned) / Double(total)
-    }
+    private func groupProgressByGroup() -> [String: Double] {
+        let progressByTeam = catalog.progressByTeam(for: ownedStickers)
+        let grouped = Dictionary(grouping: progressByTeam) { $0.team.groupCode }
 
-    private func add(_ sticker: StickerDefinition) {
-        do {
-            _ = try CollectionWriter.addSticker(
-                teamCode: sticker.teamCode,
-                number: sticker.number,
-                confidence: nil,
-                catalog: catalog,
-                context: modelContext
-            )
-        } catch {
-            editError = error.localizedDescription
+        return grouped.mapValues { progress in
+            let total = progress.reduce(0) { $0 + $1.team.stickerCount }
+            guard total > 0 else { return 0 }
+            let owned = progress.reduce(0) { $0 + $1.ownedUniqueCount }
+            return Double(owned) / Double(total)
         }
     }
 
-    private func remove(_ sticker: StickerDefinition) {
-        do {
-            _ = try CollectionWriter.removeSticker(
-                teamCode: sticker.teamCode,
-                number: sticker.number,
-                catalog: catalog,
+    private func add(_ sticker: StickerDefinition, existing: OwnedSticker?) {
+        performInstantEdit {
+            _ = CollectionWriter.addSticker(
+                definition: sticker,
+                existing: existing,
+                confidence: nil,
                 context: modelContext
             )
-        } catch {
-            editError = error.localizedDescription
+        }
+    }
+
+    private func remove(_ sticker: StickerDefinition, existing: OwnedSticker?) {
+        performInstantEdit {
+            _ = CollectionWriter.removeSticker(
+                definition: sticker,
+                existing: existing,
+                context: modelContext
+            )
+        }
+    }
+
+    private func performInstantEdit(_ edit: () -> Void) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            edit()
         }
     }
 }

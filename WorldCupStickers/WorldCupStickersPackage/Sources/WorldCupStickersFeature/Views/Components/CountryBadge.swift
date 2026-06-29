@@ -19,7 +19,7 @@ struct CountryBadge: View {
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 5)
-            .background(Color.white.opacity(0.92), in: Capsule())
+            .background(Color.cardSurface.opacity(0.92), in: Capsule())
             .foregroundStyle(Color.stickerInk)
             .accessibilityLabel(team?.name ?? fallbackCode)
         } else {

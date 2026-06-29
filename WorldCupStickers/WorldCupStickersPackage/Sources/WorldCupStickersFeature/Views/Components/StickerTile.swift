@@ -85,7 +85,10 @@ struct StickerTile: View {
             }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: quantity)
-        .animation(.bouncy(duration: 0.45).delay(Double(index) * 0.015), value: quantity)
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
         .accessibilityLabel("\(definition.displayCode), \(accessibilityState)")
         .accessibilityIdentifier("stickerTile_\(definition.id)")
     }

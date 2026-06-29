@@ -39,6 +39,20 @@ struct SettingsScreen: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    SettingsCard(title: "Fast mode", systemImage: "bolt.fill") {
+                        Toggle("Skip confirmation for new stickers", isOn: $syncStatus.fastMode)
+                        Text("When enabled, new stickers are added instantly without the confirm dialog. Duplicates still ask for confirmation.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if syncStatus.fastMode {
+                            Stepper("Skip recent: \(syncStatus.recentScanBufferSize)", value: $syncStatus.recentScanBufferSize, in: 0...20)
+                            Text("Ignores the last \(syncStatus.recentScanBufferSize) scanned stickers so you don't re-add the same one. Set to 0 to disable.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     SettingsCard(title: "Share profile", systemImage: "link.circle") {
                         LabeledContent("Web preview", value: "https://stickers.example.com/u/your-handle")
                         Label("Universal Links are scaffolded for the web app", systemImage: "link")
