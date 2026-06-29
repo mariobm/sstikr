@@ -53,6 +53,13 @@ struct SettingsScreen: View {
                         }
                     }
 
+                    SettingsCard(title: "Display", systemImage: "eye") {
+                        Toggle("Clean tiles", isOn: $syncStatus.cleanMode)
+                        Text("Hides country code and player name on owned stickers -- the image already has them. Missing stickers keep the full label.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     SettingsCard(title: "Share profile", systemImage: "link.circle") {
                         LabeledContent("Web preview", value: "https://stickers.example.com/u/your-handle")
                         Label("Universal Links are scaffolded for the web app", systemImage: "link")

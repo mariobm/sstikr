@@ -113,6 +113,7 @@ private struct TeamProgressRow: View {
 @MainActor
 private struct TeamDetailScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(SyncStatusStore.self) private var syncStatus
     @Environment(\.modelContext) private var modelContext
     @Query private var ownedStickers: [OwnedSticker]
     let progress: TeamProgress
@@ -180,6 +181,7 @@ private struct TeamDetailScreen: View {
                             owned: owned,
                             team: progress.team,
                             index: index,
+                            cleanMode: syncStatus.cleanMode,
                             onAdd: { add(sticker, existing: owned) },
                             onRemove: { remove(sticker, existing: owned) }
                         )

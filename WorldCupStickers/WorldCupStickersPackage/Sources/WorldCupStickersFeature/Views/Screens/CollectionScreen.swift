@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct CollectionScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(SyncStatusStore.self) private var syncStatus
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \OwnedSticker.updatedAt, order: .reverse) private var ownedStickers: [OwnedSticker]
     @State private var searchText = ""
@@ -148,6 +149,7 @@ struct CollectionScreen: View {
                     owned: owned,
                     team: catalog.team(for: sticker.teamCode),
                     index: index,
+                    cleanMode: syncStatus.cleanMode,
                     onAdd: { add(sticker, existing: owned) },
                     onRemove: { remove(sticker, existing: owned) }
                 )

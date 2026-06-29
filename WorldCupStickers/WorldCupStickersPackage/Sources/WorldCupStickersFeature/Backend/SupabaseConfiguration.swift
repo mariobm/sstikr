@@ -40,6 +40,7 @@ public final class SyncStatusStore {
     public var selectedVisibility: ProfileVisibility = .private
     public var fastMode: Bool = false
     public var recentScanBufferSize: Int = 5
+    public var cleanMode: Bool = true
 
     public init(configuration: SupabaseConfiguration? = .fromEnvironment()) {
         if let configuration {

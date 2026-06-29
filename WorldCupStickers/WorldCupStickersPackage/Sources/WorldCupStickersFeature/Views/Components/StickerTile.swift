@@ -6,6 +6,7 @@ struct StickerTile: View {
     let owned: OwnedSticker?
     let team: TeamDefinition?
     let index: Int
+    let cleanMode: Bool
     let onAdd: () -> Void
     let onRemove: () -> Void
 
@@ -14,6 +15,7 @@ struct StickerTile: View {
         owned: OwnedSticker?,
         team: TeamDefinition? = nil,
         index: Int = 0,
+        cleanMode: Bool = false,
         onAdd: @escaping () -> Void,
         onRemove: @escaping () -> Void
     ) {
@@ -21,12 +23,17 @@ struct StickerTile: View {
         self.owned = owned
         self.team = team
         self.index = index
+        self.cleanMode = cleanMode
         self.onAdd = onAdd
         self.onRemove = onRemove
     }
 
     private var quantity: Int {
         owned?.quantity ?? 0
+    }
+
+    private var stripOverlayInfo: Bool {
+        cleanMode && quantity > 0
     }
 
     var body: some View {
@@ -43,21 +50,33 @@ struct StickerTile: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 8) {
-                    CountryBadge(team: team, fallbackCode: definition.teamCode, compact: true)
+                    if !stripOverlayInfo {
+                        CountryBadge(team: team, fallbackCode: definition.teamCode, compact: true)
+                    }
                     Spacer(minLength: 4)
                     Text("\(definition.number)")
                         .font(.subheadline.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(quantity > 0 ? Color.white : Color.stickerInk)
+                        .padding(.horizontal, quantity > 0 ? 7 : 0)
+                        .padding(.vertical, quantity > 0 ? 4 : 0)
+                        .background {
+                            if quantity > 0 {
+                                Capsule()
+                                    .fill(Color.black.opacity(0.38))
+                            }
+                        }
                 }
 
                 Spacer(minLength: 0)
 
-                Text(definition.name)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(quantity > 0 ? Color.white : Color.stickerInk)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
+                if !stripOverlayInfo {
+                    Text(definition.name)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(quantity > 0 ? Color.white : Color.stickerInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                }
             }
             .padding(10)
 
