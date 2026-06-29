@@ -31,7 +31,7 @@ create table public.sticker_catalog (
   primary_color text,
   secondary_color text,
   sort_order integer not null,
-  catalog_version text not null default '2026.06.29-avif',
+  catalog_version text not null default '2026.06.29-avif-0.5x',
   unique (team_code, sticker_number)
 );
 

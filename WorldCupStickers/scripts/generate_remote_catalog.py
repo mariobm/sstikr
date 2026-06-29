@@ -8,7 +8,8 @@ import re
 from pathlib import Path
 
 
-CATALOG_VERSION = "2026.06.29-avif"
+CATALOG_VERSION = "2026.06.29-avif-0.5x"
+IMAGE_VARIANT_SUFFIX = "@0.5x"
 DEFAULT_BUCKET = "world-cup-stickers"
 COUNTRY_RE = re.compile(r"^[A-Z]{3}$")
 
@@ -134,13 +135,14 @@ def category(code: str, number: str, title: str) -> str:
 
 def object_key(code: str, number: str) -> str:
     if code == "00":
-        return "stickers-new/00.avif"
+        return f"stickers-new/00{IMAGE_VARIANT_SUFFIX}.avif"
     numeric = int(number)
-    return f"stickers-new/{code}/{code}-{numeric}.avif"
+    return f"stickers-new/{code}/{code}-{numeric}{IMAGE_VARIANT_SUFFIX}.avif"
 
 
 def source_path(row: dict[str, str]) -> str:
-    return str(Path(row["destination"]).with_suffix(".avif"))
+    source = Path(row["destination"]).with_suffix(".avif")
+    return str(source.with_name(f"{source.stem}{IMAGE_VARIANT_SUFFIX}{source.suffix}"))
 
 
 def collect_team_names(rows: list[dict[str, str]]) -> dict[str, str]:
