@@ -12,9 +12,9 @@ export const Route = createRootRoute({
         name: "description",
         content: "Track, compare, and exchange World Cup sticker duplicates."
       },
-      { property: "al:ios:url", content: "https://stickers.example.com" },
+      { property: "al:ios:url", content: "https://sstikr.com" },
       { property: "al:ios:app_store_id", content: appStoreID() },
-      { property: "al:web:url", content: "https://stickers.example.com" },
+      { property: "al:web:url", content: "https://sstikr.com" },
       { property: "al:web:should_fallback", content: "true" }
     ],
     links: [{ rel: "stylesheet", href: appCss }]

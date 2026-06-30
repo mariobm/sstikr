@@ -13,10 +13,11 @@ public struct SupabaseConfiguration: Equatable, Sendable {
 
     public static func fromEnvironment() -> SupabaseConfiguration? {
         let environment = ProcessInfo.processInfo.environment
+        let resourceConfiguration = fromResource()
         let bundle = Bundle.main
-        let urlString = environment["SUPABASE_URL"] ?? bundle.infoString(forKey: "SUPABASE_URL")
-        let key = environment["SUPABASE_PUBLISHABLE_KEY"] ?? bundle.infoString(forKey: "SUPABASE_PUBLISHABLE_KEY")
-        let redirectString = environment["SUPABASE_REDIRECT_URL"] ?? bundle.infoString(forKey: "SUPABASE_REDIRECT_URL") ?? "worldcupstickers://auth"
+        let urlString = environment["SUPABASE_URL"] ?? resourceConfiguration?.projectURL.absoluteString ?? bundle.infoString(forKey: "SUPABASE_URL")
+        let key = environment["SUPABASE_PUBLISHABLE_KEY"] ?? resourceConfiguration?.publishableKey ?? bundle.infoString(forKey: "SUPABASE_PUBLISHABLE_KEY")
+        let redirectString = environment["SUPABASE_REDIRECT_URL"] ?? resourceConfiguration?.redirectURL.absoluteString ?? bundle.infoString(forKey: "SUPABASE_REDIRECT_URL") ?? "sstikr://auth"
 
         guard let urlString,
               let key,
@@ -31,6 +32,28 @@ public struct SupabaseConfiguration: Equatable, Sendable {
             redirectURL: redirectURL
         )
     }
+
+    private static func fromResource() -> SupabaseConfiguration? {
+        guard let url = Bundle.module.url(forResource: "SupabaseConfig", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let decoded = try? JSONDecoder().decode(SupabaseConfigurationResource.self, from: data),
+              let projectURL = URL(string: decoded.supabaseURL),
+              let redirectURL = URL(string: decoded.redirectURL ?? "sstikr://auth") else {
+            return nil
+        }
+
+        return SupabaseConfiguration(
+            projectURL: projectURL,
+            publishableKey: decoded.supabasePublishableKey,
+            redirectURL: redirectURL
+        )
+    }
+}
+
+private struct SupabaseConfigurationResource: Decodable {
+    let supabaseURL: String
+    let supabasePublishableKey: String
+    let redirectURL: String?
 }
 
 public enum BackendPhaseStatus: Sendable {

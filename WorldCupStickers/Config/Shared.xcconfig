@@ -8,7 +8,7 @@
 // ==========================================
 PRODUCT_NAME = WorldCupStickers
 PRODUCT_DISPLAY_NAME = World Cup Stickers
-PRODUCT_BUNDLE_IDENTIFIER = com.mariobalukcic.worldcupstickers
+PRODUCT_BUNDLE_IDENTIFIER = com.sstikr.worldcupstickers
 MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
 DEVELOPMENT_TEAM = RJS3R23FND
@@ -24,13 +24,8 @@ TARGETED_DEVICE_FAMILY = 1,2
 // ==========================================
 // Info PLIST
 // ==========================================
-GENERATE_INFOPLIST_FILE = YES
-INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait
-INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
-INFOPLIST_KEY_NSCameraUsageDescription = Scan the top-right sticker code on the back of each World Cup sticker before you confirm it.
-INFOPLIST_KEY_SUPABASE_URL = $(SUPABASE_URL)
-INFOPLIST_KEY_SUPABASE_PUBLISHABLE_KEY = $(SUPABASE_PUBLISHABLE_KEY)
-INFOPLIST_KEY_SUPABASE_REDIRECT_URL = $(SUPABASE_REDIRECT_URL)
+GENERATE_INFOPLIST_FILE = NO
+INFOPLIST_FILE = Config/Info.plist
 
 // ==========================================
 // Backend Configuration
@@ -39,6 +34,9 @@ INFOPLIST_KEY_SUPABASE_REDIRECT_URL = $(SUPABASE_REDIRECT_URL)
 SUPABASE_URL =
 SUPABASE_PUBLISHABLE_KEY =
 SUPABASE_REDIRECT_URL =
+
+// Local.xcconfig is git-ignored and can provide the public Supabase client values for device builds.
+#include? "Local.xcconfig"
 
 // ==========================================
 // Entitlements

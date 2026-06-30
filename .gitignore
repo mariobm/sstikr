@@ -15,7 +15,11 @@ web-tanstack/node_modules/
 web-tanstack/dist/
 web-tanstack/.tanstack/tmp/
 web-tanstack/.wrangler/
+web-tanstack/.dev.vars
+web-tanstack/.env.local
 
 WorldCupStickers/output/
 WorldCupStickers/web/
 WorldCupStickers/tmp/
+WorldCupStickers/Config/Local.xcconfig
+WorldCupStickers/WorldCupStickersPackage/Sources/WorldCupStickersFeature/Resources/SupabaseConfig.json

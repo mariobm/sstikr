@@ -161,4 +161,81 @@ public enum CollectionWriter {
         }
         return owned.count
     }
+
+    /// Sets the quantity of a sticker, creating or deleting the owned record as needed.
+    public static func setStickerQuantity(
+        stickerID: String,
+        teamCode: String,
+        number: Int,
+        quantity: Int,
+        context: ModelContext
+    ) throws {
+        let descriptor = FetchDescriptor<OwnedSticker>(
+            predicate: #Predicate { owned in
+                owned.stickerID == stickerID
+            }
+        )
+
+        let existing = try context.fetch(descriptor).first
+
+        if quantity <= 0 {
+            if let existing {
+                context.delete(existing)
+            }
+            return
+        }
+
+        if let existing {
+            existing.quantity = quantity
+            existing.updatedAt = Date()
+            existing.syncState = .pendingUpload
+        } else {
+            let owned = OwnedSticker(
+                stickerID: stickerID,
+                teamCode: teamCode,
+                number: number,
+                quantity: quantity
+            )
+            context.insert(owned)
+        }
+    }
+
+    /// Deletes all owned stickers.
+    @discardableResult
+    public static func clearAll(context: ModelContext) throws -> Int {
+        let descriptor = FetchDescriptor<OwnedSticker>()
+        let all = try context.fetch(descriptor)
+        for sticker in all {
+            context.delete(sticker)
+        }
+        return all.count
+    }
+
+    /// Imports a collection transfer, replacing all current owned stickers.
+    public static func importCollection(
+        _ data: CollectionTransferData,
+        catalog: StickerCatalogStore,
+        context: ModelContext
+    ) throws -> Int {
+        let stickersBySortOrder = Dictionary(
+            uniqueKeysWithValues: catalog.stickers.map { ($0.sortOrder, $0) }
+        )
+
+        try clearAll(context: context)
+
+        var imported = 0
+        for globalNumber in data.ownedNumbers {
+            guard let definition = stickersBySortOrder[globalNumber] else { continue }
+            let quantity = data.quantity(for: globalNumber)
+            try setStickerQuantity(
+                stickerID: definition.id,
+                teamCode: definition.teamCode,
+                number: definition.number,
+                quantity: quantity,
+                context: context
+            )
+            imported += 1
+        }
+        return imported
+    }
 }

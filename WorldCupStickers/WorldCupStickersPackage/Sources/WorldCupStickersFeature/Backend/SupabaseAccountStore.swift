@@ -1,6 +1,10 @@
 import Foundation
 import Supabase
 import SwiftData
+import UIKit
+
+@_spi(Experimental) import Auth
+import AuthenticationServices
 
 @MainActor
 @Observable
@@ -19,7 +23,10 @@ public final class SupabaseAccountStore {
         if let configuration {
             self.client = SupabaseClient(
                 supabaseURL: configuration.projectURL,
-                supabaseKey: configuration.publishableKey
+                supabaseKey: configuration.publishableKey,
+                options: .init(
+                    auth: .init(redirectToURL: configuration.redirectURL)
+                )
             )
             self.state = .signedOut
         } else {
@@ -74,8 +81,29 @@ public final class SupabaseAccountStore {
         defer { isBusy = false }
 
         do {
-            try await client.auth.signInWithOTP(email: normalizedEmail)
+            try await client.auth.signInWithOTP(
+                email: normalizedEmail,
+                redirectTo: configuration?.redirectURL
+            )
             state = .codeSent(email: normalizedEmail)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func handleAuthRedirect(_ url: URL) async {
+        guard let client else {
+            state = .notConfigured
+            return
+        }
+
+        isBusy = true
+        lastError = nil
+        defer { isBusy = false }
+
+        do {
+            let session = try await client.auth.session(from: url)
+            state = .signedIn(SupabaseAccount(userID: session.user.id, email: session.user.email))
         } catch {
             lastError = error.localizedDescription
         }
@@ -124,6 +152,66 @@ public final class SupabaseAccountStore {
             state = .signedOut
             lastSyncSummary = nil
             lastSyncedAt = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func signInWithPasskey() async {
+        guard let client else {
+            state = .notConfigured
+            return
+        }
+
+        isBusy = true
+        lastError = nil
+        defer { isBusy = false }
+
+        do {
+            _ = try await client.auth.signInWithPasskey(
+                presentationAnchor: passkeyPresentationAnchor()
+            )
+            let session = try await client.auth.session
+            state = .signedIn(SupabaseAccount(userID: session.user.id, email: session.user.email))
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func registerPasskey() async {
+        guard let client else {
+            state = .notConfigured
+            return
+        }
+
+        isBusy = true
+        lastError = nil
+        defer { isBusy = false }
+
+        do {
+            _ = try await client.auth.registerPasskey(
+                presentationAnchor: passkeyPresentationAnchor()
+            )
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func listPasskeys() async -> [PasskeyListItem] {
+        guard let client else { return [] }
+        do {
+            return try await client.auth.listPasskeys()
+        } catch {
+            return []
+        }
+    }
+
+    func deletePasskey(id: String) async {
+        guard let client else { return }
+        do {
+            try await client.auth.deletePasskey(id: id)
         } catch {
             lastError = error.localizedDescription
         }
@@ -181,4 +269,12 @@ public struct SupabaseAccount: Equatable, Sendable {
         self.id = userID
         self.email = email
     }
+}
+
+@MainActor
+private func passkeyPresentationAnchor() -> ASPresentationAnchor {
+    UIApplication.shared.connectedScenes
+        .compactMap { $0 as? UIWindowScene }
+        .first { $0.activationState == .foregroundActive }?
+        .windows.first { $0.isKeyWindow } ?? UIWindow()
 }

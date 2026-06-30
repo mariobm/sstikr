@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+@_spi(Experimental) import Auth
 
 @MainActor
 struct AccountSheet: View {
@@ -11,7 +12,7 @@ struct AccountSheet: View {
     @Query(sort: \OwnedSticker.updatedAt, order: .reverse) private var ownedStickers: [OwnedSticker]
     @Query(sort: \CollectionMutation.createdAt, order: .forward) private var mutations: [CollectionMutation]
     @State private var email = ""
-    @State private var code = ""
+    @State private var passkeys: [PasskeyListItem] = []
 
     var body: some View {
         NavigationStack {
@@ -51,6 +52,9 @@ struct AccountSheet: View {
             }
             .task {
                 await accountStore.refreshSession()
+                if case .signedIn = accountStore.state {
+                    passkeys = await accountStore.listPasskeys()
+                }
             }
         }
     }
@@ -90,25 +94,43 @@ struct AccountSheet: View {
     }
 
     private var signInContent: some View {
-        AccountPanel(title: "Sign in with email", systemImage: "envelope.fill") {
-            TextField("Email", text: $email)
-                .keyboardType(.emailAddress)
-                .textContentType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(12)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        VStack(spacing: 16) {
+            AccountPanel(title: "Sign in with passkey", systemImage: "person.badge.key.fill") {
+                Text("Use Face ID or Touch ID to sign in instantly if you've already registered a passkey on this device.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                Task {
-                    await accountStore.sendSignInCode(to: email)
+                Button {
+                    Task { await accountStore.signInWithPasskey() }
+                } label: {
+                    Label("Sign in with passkey", systemImage: "faceid")
                 }
-            } label: {
-                Label("Send code", systemImage: "paperplane.fill")
+                .buttonStyle(.borderedProminent)
+                .tint(.stickerTeal)
+                .disabled(accountStore.isBusy)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.stickerTeal)
-            .disabled(accountStore.isBusy)
+
+            AccountPanel(title: "Sign in with email", systemImage: "envelope.fill") {
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(12)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                Button {
+                    Task {
+                        await accountStore.sendSignInCode(to: email)
+                    }
+                } label: {
+                    Label("Send code", systemImage: "paperplane.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.stickerTeal)
+                .disabled(accountStore.isBusy)
+            }
 
             Button("Continue offline") {
                 dismiss()
@@ -118,28 +140,12 @@ struct AccountSheet: View {
     }
 
     private func codeContent(email: String) -> some View {
-        AccountPanel(title: "Enter code", systemImage: "number.square.fill") {
-            Text("We sent a sign-in code to \(email).")
+        AccountPanel(title: "Check your email", systemImage: "envelope.badge.fill") {
+            Text("We sent a secure sign-in link to \(email). Open it on this iPhone and the app will finish signing in automatically.")
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            TextField("Code", text: $code)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .padding(12)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            Button {
-                Task {
-                    await accountStore.verifyCode(code, email: email)
-                }
-            } label: {
-                Label("Verify and sign in", systemImage: "checkmark.circle.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.stickerTeal)
-            .disabled(accountStore.isBusy)
-
-            Button("Send another code") {
+            Button("Send another link") {
                 Task {
                     await accountStore.sendSignInCode(to: email)
                 }
@@ -149,38 +155,85 @@ struct AccountSheet: View {
     }
 
     private func signedInContent(_ account: SupabaseAccount) -> some View {
-        AccountPanel(title: "Signed in", systemImage: "checkmark.icloud.fill") {
-            LabeledContent("Email", value: account.email ?? "Unknown")
-            LabeledContent("User ID", value: account.id.uuidString)
-                .font(.caption)
-
-            if let summary = accountStore.lastSyncSummary {
-                Label(summary, systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(Color.stickerTeal)
-            }
-
-            if let lastSyncedAt = accountStore.lastSyncedAt {
-                Text(lastSyncedAt, style: .relative)
+        VStack(spacing: 16) {
+            AccountPanel(title: "Signed in", systemImage: "checkmark.icloud.fill") {
+                LabeledContent("Email", value: account.email ?? "Unknown")
+                LabeledContent("User ID", value: account.id.uuidString)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                if let summary = accountStore.lastSyncSummary {
+                    Label(summary, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.stickerTeal)
+                }
+
+                if let lastSyncedAt = accountStore.lastSyncedAt {
+                    Text(lastSyncedAt, style: .relative)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Button {
+                    Task {
+                        await accountStore.syncNow(
+                            ownedStickers: ownedStickers,
+                            mutations: mutations,
+                            visibility: syncStatus.selectedVisibility,
+                            catalog: catalog,
+                            context: modelContext
+                        )
+                    }
+                } label: {
+                    Label(accountStore.isBusy ? "Syncing..." : "Sync now", systemImage: "arrow.triangle.2.circlepath.icloud")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.stickerTeal)
+                .disabled(accountStore.isBusy)
             }
 
-            Button {
-                Task {
-                    await accountStore.syncNow(
-                        ownedStickers: ownedStickers,
-                        mutations: mutations,
-                        visibility: syncStatus.selectedVisibility,
-                        catalog: catalog,
-                        context: modelContext
-                    )
+            AccountPanel(title: "Passkeys", systemImage: "person.badge.key.fill") {
+                if passkeys.isEmpty {
+                    Text("No passkeys registered yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(passkeys) { passkey in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(passkey.friendlyName ?? "Unnamed passkey")
+                                    .font(.subheadline.weight(.medium))
+                                if let lastUsedAt = passkey.lastUsedAt {
+                                    Text("Last used \(lastUsedAt, style: .relative)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                Task {
+                                    await accountStore.deletePasskey(id: passkey.id)
+                                    passkeys = await accountStore.listPasskeys()
+                                }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.red)
+                        }
+                    }
                 }
-            } label: {
-                Label(accountStore.isBusy ? "Syncing..." : "Sync now", systemImage: "arrow.triangle.2.circlepath.icloud")
+
+                Button {
+                    Task {
+                        await accountStore.registerPasskey()
+                        passkeys = await accountStore.listPasskeys()
+                    }
+                } label: {
+                    Label("Register passkey on this device", systemImage: "faceid")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.stickerTeal)
+                .disabled(accountStore.isBusy)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.stickerTeal)
-            .disabled(accountStore.isBusy)
 
             Button(role: .destructive) {
                 Task {

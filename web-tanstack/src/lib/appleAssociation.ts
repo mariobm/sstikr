@@ -1,7 +1,7 @@
 export function appleAssociation() {
   const env = typeof process !== "undefined" ? process.env : {};
-  const teamID = env.APPLE_TEAM_ID ?? "TEAMID";
-  const bundleID = env.IOS_BUNDLE_ID ?? "com.mariobalukcic.worldcupstickers";
+  const teamID = env.APPLE_TEAM_ID ?? "RJS3R23FND";
+  const bundleID = env.IOS_BUNDLE_ID ?? "com.sstikr.worldcupstickers";
 
   return {
     applinks: {
@@ -12,6 +12,9 @@ export function appleAssociation() {
           paths: ["/u/*"]
         }
       ]
+    },
+    webcredentials: {
+      apps: [`${teamID}.${bundleID}`]
     }
   };
 }

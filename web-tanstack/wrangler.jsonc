@@ -1,10 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "world-cup-stickers-web",
+  "name": "sstikr-web",
   "compatibility_date": "2026-06-29",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
   "observability": {
     "enabled": true
-  }
+  },
+  "routes": [
+    {
+      "pattern": "sstikr.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.sstikr.com",
+      "custom_domain": true
+    }
+  ]
 }

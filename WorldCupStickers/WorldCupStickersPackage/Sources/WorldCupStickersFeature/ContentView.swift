@@ -22,6 +22,11 @@ public struct ContentView: View {
                 await catalogStore.load()
                 await accountStore.refreshSession()
             }
+            .onOpenURL { url in
+                Task {
+                    await accountStore.handleAuthRedirect(url)
+                }
+            }
     }
 }
 

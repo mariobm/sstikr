@@ -1,11 +1,17 @@
+import SwiftData
 import SwiftUI
 
 @MainActor
 struct SettingsScreen: View {
     @Environment(SyncStatusStore.self) private var syncStatus
     @Environment(SupabaseAccountStore.self) private var accountStore
+    @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(\.modelContext) private var modelContext
+    @Query private var ownedStickers: [OwnedSticker]
     @State private var didClearImageCache = false
     @State private var isAccountSheetPresented = false
+    @State private var isExportSheetPresented = false
+    @State private var isImportSheetPresented = false
 
     var body: some View {
         @Bindable var syncStatus = syncStatus
@@ -86,6 +92,28 @@ struct SettingsScreen: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    SettingsCard(title: "Transfer collection", systemImage: "arrow.up.arrow.down.square") {
+                        Button {
+                            isExportSheetPresented = true
+                        } label: {
+                            Label("Export collection", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.stickerTeal)
+
+                        Button {
+                            isImportSheetPresented = true
+                        } label: {
+                            Label("Import collection", systemImage: "square.and.arrow.down")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.stickerTeal)
+
+                        Text("Export your stickers as text to transfer between devices. Import replaces your current collection.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     SettingsCard(title: "Share profile", systemImage: "link.circle") {
                         LabeledContent("Web preview", value: "https://stickers.example.com/u/your-handle")
                         Label("Universal Links are scaffolded for the web app", systemImage: "link")
@@ -111,6 +139,19 @@ struct SettingsScreen: View {
             }
             .sheet(isPresented: $isAccountSheetPresented) {
                 AccountSheet()
+            }
+            .sheet(isPresented: $isExportSheetPresented) {
+                ExportSheet(
+                    exportText: CollectionTransfer.export(
+                        ownedStickers: ownedStickers,
+                        catalog: catalog
+                    )
+                )
+            }
+            .sheet(isPresented: $isImportSheetPresented) {
+                ImportSheet { text in
+                    importCollection(text)
+                }
             }
         }
     }
@@ -141,6 +182,19 @@ struct SettingsScreen: View {
             "Enter code"
         case .notConfigured, .signedOut:
             "Sign in"
+        }
+    }
+
+    private func importCollection(_ text: String) {
+        guard let data = CollectionTransfer.parse(text) else { return }
+        do {
+            _ = try CollectionWriter.importCollection(
+                data,
+                catalog: catalog,
+                context: modelContext
+            )
+        } catch {
+            // Silent failure -- the sheet handles its own error display
         }
     }
 }
@@ -178,5 +232,125 @@ private struct RoadmapRow: View {
             .font(.subheadline.weight(.medium))
             .foregroundStyle(Color.stickerInk)
             .labelStyle(.titleAndIcon)
+    }
+}
+
+@MainActor
+private struct ExportSheet: View {
+    let exportText: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Copy the text below or share it to your new device.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text(exportText)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(Color.stickerInk)
+                        .padding(12)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .textSelection(.enabled)
+
+                    Button {
+                        UIPasteboard.general.string = exportText
+                        withAnimation { copied = true }
+                    } label: {
+                        Label(copied ? "Copied!" : "Copy to clipboard", systemImage: copied ? "checkmark.circle.fill" : "doc.on.doc")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.stickerTeal)
+
+                    ShareLink(item: exportText) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.stickerTeal)
+                }
+                .padding(20)
+            }
+            .background(StickerBackdrop())
+            .navigationTitle("Export")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+private struct ImportSheet: View {
+    let onImport: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var showingConfirm = false
+    @State private var parseError = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Paste your exported collection text. This will replace your current collection.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextEditor(text: $text)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 160)
+                        .padding(8)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+
+                    if parseError {
+                        Label("Invalid format. Expected SA26|1|...|...", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    Button {
+                        if CollectionTransfer.parse(text) != nil {
+                            showingConfirm = true
+                        } else {
+                            withAnimation { parseError = true }
+                        }
+                    } label: {
+                        Label("Import", systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.stickerTeal)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(20)
+            }
+            .background(StickerBackdrop())
+            .navigationTitle("Import")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .confirmationDialog(
+                "Replace your collection?",
+                isPresented: $showingConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Replace and import", role: .destructive) {
+                    onImport(text)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will delete all your current stickers and import the ones from the text. This cannot be undone.")
+            }
+        }
     }
 }
