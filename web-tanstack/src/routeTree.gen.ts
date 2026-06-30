@@ -9,11 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AppleAppSiteAssociationRouteImport } from './routes/apple-app-site-association'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UShareSlugRouteImport } from './routes/u/$shareSlug'
+import { Route as ApiProfileAvatarRouteImport } from './routes/api/profile/avatar'
+import { Route as ApiAccountDeleteRouteImport } from './routes/api/account/delete'
 
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppleAppSiteAssociationRoute = AppleAppSiteAssociationRouteImport.update({
   id: '/apple-app-site-association',
   path: '/apple-app-site-association',
@@ -34,43 +42,94 @@ const UShareSlugRoute = UShareSlugRouteImport.update({
   path: '/u/$shareSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfileAvatarRoute = ApiProfileAvatarRouteImport.update({
+  id: '/api/profile/avatar',
+  path: '/api/profile/avatar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAccountDeleteRoute = ApiAccountDeleteRouteImport.update({
+  id: '/api/account/delete',
+  path: '/api/account/delete',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/apple-app-site-association': typeof AppleAppSiteAssociationRoute
+  '/privacy': typeof PrivacyRoute
   '/u/$shareSlug': typeof UShareSlugRoute
+  '/api/account/delete': typeof ApiAccountDeleteRoute
+  '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/apple-app-site-association': typeof AppleAppSiteAssociationRoute
+  '/privacy': typeof PrivacyRoute
   '/u/$shareSlug': typeof UShareSlugRoute
+  '/api/account/delete': typeof ApiAccountDeleteRoute
+  '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/apple-app-site-association': typeof AppleAppSiteAssociationRoute
+  '/privacy': typeof PrivacyRoute
   '/u/$shareSlug': typeof UShareSlugRoute
+  '/api/account/delete': typeof ApiAccountDeleteRoute
+  '/api/profile/avatar': typeof ApiProfileAvatarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$' | '/apple-app-site-association' | '/u/$shareSlug'
+  fullPaths:
+    | '/'
+    | '/$'
+    | '/apple-app-site-association'
+    | '/privacy'
+    | '/u/$shareSlug'
+    | '/api/account/delete'
+    | '/api/profile/avatar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$' | '/apple-app-site-association' | '/u/$shareSlug'
-  id: '__root__' | '/' | '/$' | '/apple-app-site-association' | '/u/$shareSlug'
+  to:
+    | '/'
+    | '/$'
+    | '/apple-app-site-association'
+    | '/privacy'
+    | '/u/$shareSlug'
+    | '/api/account/delete'
+    | '/api/profile/avatar'
+  id:
+    | '__root__'
+    | '/'
+    | '/$'
+    | '/apple-app-site-association'
+    | '/privacy'
+    | '/u/$shareSlug'
+    | '/api/account/delete'
+    | '/api/profile/avatar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   AppleAppSiteAssociationRoute: typeof AppleAppSiteAssociationRoute
+  PrivacyRoute: typeof PrivacyRoute
   UShareSlugRoute: typeof UShareSlugRoute
+  ApiAccountDeleteRoute: typeof ApiAccountDeleteRoute
+  ApiProfileAvatarRoute: typeof ApiProfileAvatarRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/apple-app-site-association': {
       id: '/apple-app-site-association'
       path: '/apple-app-site-association'
@@ -99,6 +158,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UShareSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profile/avatar': {
+      id: '/api/profile/avatar'
+      path: '/api/profile/avatar'
+      fullPath: '/api/profile/avatar'
+      preLoaderRoute: typeof ApiProfileAvatarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/account/delete': {
+      id: '/api/account/delete'
+      path: '/api/account/delete'
+      fullPath: '/api/account/delete'
+      preLoaderRoute: typeof ApiAccountDeleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -106,7 +179,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AppleAppSiteAssociationRoute: AppleAppSiteAssociationRoute,
+  PrivacyRoute: PrivacyRoute,
   UShareSlugRoute: UShareSlugRoute,
+  ApiAccountDeleteRoute: ApiAccountDeleteRoute,
+  ApiProfileAvatarRoute: ApiProfileAvatarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

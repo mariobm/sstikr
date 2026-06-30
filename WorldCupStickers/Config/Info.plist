@@ -13,6 +13,12 @@
 			</array>
 		</dict>
 	</array>
+	<key>SUPABASE_PUBLISHABLE_KEY</key>
+	<string>sb_publishable_xmEEZoiGrzZsEjbtyrjdhg_sPoTnf7P</string>
+	<key>SUPABASE_REDIRECT_URL</key>
+	<string>sstikr://auth</string>
+	<key>SUPABASE_URL</key>
+	<string>https://xuiimwcktmdjgupczfjb.supabase.co</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

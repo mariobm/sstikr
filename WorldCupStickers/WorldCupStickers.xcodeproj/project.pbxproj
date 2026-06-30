@@ -191,6 +191,9 @@
 			productRefGroup = 8B41F6462DEDD0D5001A66F9 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (
+				8BD71C0B2DEE41E000CEDD92 /* XCLocalSwiftPackageReference "WorldCupStickersPackage" */,
+			);
 			targets = (
 				8B41F6442DEDD0D5001A66F9 /* WorldCupStickers */,
 				8B41F65B2DEDD0D6001A66F9 /* WorldCupStickersUITests */,
@@ -373,7 +376,7 @@
 				DEVELOPMENT_TEAM = RJS3R23FND;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "World Cup Stickers";
+				INFOPLIST_KEY_CFBundleDisplayName = Sstikr;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan the top-right sticker code on the back of each World Cup sticker before you confirm it.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -401,7 +404,7 @@
 				DEVELOPMENT_TEAM = RJS3R23FND;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "World Cup Stickers";
+				INFOPLIST_KEY_CFBundleDisplayName = Sstikr;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan the top-right sticker code on the back of each World Cup sticker before you confirm it.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -478,13 +481,22 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		8BD71C0B2DEE41E000CEDD92 /* XCLocalSwiftPackageReference "WorldCupStickersPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = WorldCupStickersPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		8B41F6822DEDD23B001A66F9 /* WorldCupStickersFeature */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 8BD71C0B2DEE41E000CEDD92 /* XCLocalSwiftPackageReference "WorldCupStickersPackage" */;
 			productName = WorldCupStickersFeature;
 		};
 		8B41F6842DEDD25C001A66F9 /* WorldCupStickersFeature */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 8BD71C0B2DEE41E000CEDD92 /* XCLocalSwiftPackageReference "WorldCupStickersPackage" */;
 			productName = WorldCupStickersFeature;
 		};
 /* End XCSwiftPackageProductDependency section */

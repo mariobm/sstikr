@@ -45,6 +45,6 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
 }
 
 function appStoreID() {
-  const env = typeof process !== "undefined" ? process.env : {};
+  const env: Record<string, string | undefined> = typeof process !== "undefined" ? process.env : {};
   return env.APP_STORE_ID ?? env.NEXT_PUBLIC_APP_STORE_ID ?? import.meta.env.VITE_APP_STORE_ID ?? "0000000000";
 }

@@ -7,6 +7,17 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "SUPABASE_URL": "https://xuiimwcktmdjgupczfjb.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_xmEEZoiGrzZsEjbtyrjdhg_sPoTnf7P",
+    "R2_PUBLIC_BASE_URL": "https://pub-3b9d1ae073c04cb09a9be9e70f160f7b.r2.dev"
+  },
+  "r2_buckets": [
+    {
+      "binding": "PROFILE_AVATARS",
+      "bucket_name": "world-cup-stickers"
+    }
+  ],
   "routes": [
     {
       "pattern": "sstikr.com",

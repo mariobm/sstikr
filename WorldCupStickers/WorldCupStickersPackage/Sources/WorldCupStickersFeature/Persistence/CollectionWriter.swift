@@ -211,6 +211,45 @@ public enum CollectionWriter {
         return all.count
     }
 
+    /// Removes all local collection state, including pending sync mutations.
+    public static func clearLocalData(context: ModelContext) throws -> CollectionClearResult {
+        let owned = try context.fetch(FetchDescriptor<OwnedSticker>())
+        let mutations = try context.fetch(FetchDescriptor<CollectionMutation>())
+
+        for sticker in owned {
+            context.delete(sticker)
+        }
+
+        for mutation in mutations {
+            context.delete(mutation)
+        }
+
+        return CollectionClearResult(
+            ownedStickerCount: owned.count,
+            mutationCount: mutations.count
+        )
+    }
+
+    /// Keeps the local album but detaches it from the deleted cloud account.
+    @discardableResult
+    public static func resetCloudSyncMetadata(context: ModelContext) throws -> Int {
+        let owned = try context.fetch(FetchDescriptor<OwnedSticker>())
+        let mutations = try context.fetch(FetchDescriptor<CollectionMutation>())
+
+        for sticker in owned {
+            sticker.serverID = nil
+            sticker.syncState = .localOnly
+            sticker.lastSyncedAt = nil
+            sticker.clientMutationID = UUID()
+        }
+
+        for mutation in mutations {
+            context.delete(mutation)
+        }
+
+        return owned.count
+    }
+
     /// Imports a collection transfer, replacing all current owned stickers.
     public static func importCollection(
         _ data: CollectionTransferData,
@@ -238,4 +277,9 @@ public enum CollectionWriter {
         }
         return imported
     }
+}
+
+public struct CollectionClearResult: Equatable, Sendable {
+    public let ownedStickerCount: Int
+    public let mutationCount: Int
 }

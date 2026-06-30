@@ -139,21 +139,30 @@ enum StickerCloudSyncService {
         visibility: ProfileVisibility,
         client: SupabaseClient
     ) async throws {
-        let displayName: String
-        if let localPart = email?.split(separator: "@", maxSplits: 1).first, !localPart.isEmpty {
-            displayName = String(localPart)
-        } else {
-            displayName = "Collector"
-        }
-
-        try await client
+        let existing: [ProfileIDRow] = try await client
             .from("profiles")
-            .upsert(ProfileUpsert(
-                id: userID,
-                displayName: displayName,
-                duplicateVisibility: visibility.rawValue
-            ))
+            .select("id")
+            .eq("id", value: userID.uuidString)
+            .limit(1)
             .execute()
+            .value
+
+        if existing.isEmpty {
+            try await client
+                .from("profiles")
+                .upsert(ProfileUpsert(
+                    id: userID,
+                    displayName: SupabaseAccountStore.defaultDisplayName(email: email),
+                    duplicateVisibility: visibility
+                ))
+                .execute()
+        } else {
+            try await client
+                .from("profiles")
+                .update(ProfileVisibilityUpdate(duplicateVisibility: visibility))
+                .eq("id", value: userID.uuidString)
+                .execute()
+        }
     }
 }
 
@@ -172,11 +181,23 @@ struct StickerCloudSyncResult: Sendable {
 private struct ProfileUpsert: Encodable {
     let id: UUID
     let displayName: String
-    let duplicateVisibility: String
+    let duplicateVisibility: ProfileVisibility
 
     enum CodingKeys: String, CodingKey {
         case id
         case displayName = "display_name"
+        case duplicateVisibility = "duplicate_visibility"
+    }
+}
+
+private struct ProfileIDRow: Decodable {
+    let id: UUID
+}
+
+private struct ProfileVisibilityUpdate: Encodable {
+    let duplicateVisibility: ProfileVisibility
+
+    enum CodingKeys: String, CodingKey {
         case duplicateVisibility = "duplicate_visibility"
     }
 }

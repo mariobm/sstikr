@@ -1,5 +1,7 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
+import UIKit
 @_spi(Experimental) import Auth
 
 @MainActor
@@ -13,6 +15,11 @@ struct AccountSheet: View {
     @Query(sort: \CollectionMutation.createdAt, order: .forward) private var mutations: [CollectionMutation]
     @State private var email = ""
     @State private var passkeys: [PasskeyListItem] = []
+    @State private var profileDisplayName = ""
+    @State private var profileHandle = ""
+    @State private var didCopyProfileLink = false
+    @State private var selectedAvatarItem: PhotosPickerItem?
+    @State private var avatarPreviewImage: UIImage?
 
     var body: some View {
         NavigationStack {
@@ -54,6 +61,16 @@ struct AccountSheet: View {
                 await accountStore.refreshSession()
                 if case .signedIn = accountStore.state {
                     passkeys = await accountStore.listPasskeys()
+                    populateProfileFields()
+                }
+            }
+            .onChange(of: accountStore.profile) { _, _ in
+                populateProfileFields()
+            }
+            .onChange(of: selectedAvatarItem) { _, item in
+                guard let item else { return }
+                Task {
+                    await uploadAvatar(from: item)
                 }
             }
         }
@@ -156,6 +173,8 @@ struct AccountSheet: View {
 
     private func signedInContent(_ account: SupabaseAccount) -> some View {
         VStack(spacing: 16) {
+            profileContent
+
             AccountPanel(title: "Signed in", systemImage: "checkmark.icloud.fill") {
                 LabeledContent("Email", value: account.email ?? "Unknown")
                 LabeledContent("User ID", value: account.id.uuidString)
@@ -245,6 +264,140 @@ struct AccountSheet: View {
             .disabled(accountStore.isBusy)
         }
     }
+
+    private var profileContent: some View {
+        let isBusy = accountStore.isBusy
+
+        return AccountPanel(title: "Profile", systemImage: "person.text.rectangle.fill") {
+            HStack(alignment: .center, spacing: 14) {
+                profileAvatar
+
+                PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
+                    Label(isBusy ? "Uploading..." : "Choose photo", systemImage: "photo.badge.plus")
+                }
+                .buttonStyle(.bordered)
+                .tint(.stickerTeal)
+                .disabled(isBusy)
+            }
+
+            TextField("Display name", text: $profileDisplayName)
+                .textContentType(.name)
+                .padding(12)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            TextField("Username", text: $profileHandle)
+                .textContentType(.username)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(12)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            Text("Username is used for your public profile link. Leave it empty to use the private share slug.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let profile = accountStore.profile {
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("Profile link", value: profile.shareURL.absoluteString)
+                        .font(.caption)
+                        .textSelection(.enabled)
+
+                    HStack {
+                        ShareLink(item: profile.shareURL) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.stickerTeal)
+
+                        Button {
+                            UIPasteboard.general.string = profile.shareURL.absoluteString
+                            withAnimation { didCopyProfileLink = true }
+                        } label: {
+                            Label(didCopyProfileLink ? "Copied" : "Copy", systemImage: didCopyProfileLink ? "checkmark.circle.fill" : "doc.on.doc")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.stickerTeal)
+                    }
+                }
+            }
+
+            Button {
+                Task {
+                    await accountStore.saveProfile(
+                        displayName: profileDisplayName,
+                        handle: profileHandle,
+                        visibility: syncStatus.selectedVisibility
+                    )
+                    populateProfileFields()
+                }
+            } label: {
+                Label(accountStore.isBusy ? "Saving..." : "Save profile", systemImage: "checkmark.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.stickerTeal)
+            .disabled(accountStore.isBusy || profileDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    @ViewBuilder
+    private var profileAvatar: some View {
+        ZStack {
+            Circle()
+                .fill(.thinMaterial)
+
+            if let avatarPreviewImage {
+                Image(uiImage: avatarPreviewImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if let avatarURL = accountStore.profile?.avatarURL {
+                AsyncImage(url: avatarURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        avatarFallback
+                    case .empty:
+                        ProgressView()
+                    @unknown default:
+                        avatarFallback
+                    }
+                }
+            } else {
+                avatarFallback
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
+    }
+
+    private var avatarFallback: some View {
+        Image(systemName: "person.crop.circle.fill")
+            .font(.system(size: 54, weight: .semibold))
+            .foregroundStyle(Color.stickerTeal)
+    }
+
+    private func populateProfileFields() {
+        guard let profile = accountStore.profile else { return }
+        profileDisplayName = profile.displayName
+        profileHandle = profile.handle ?? ""
+        syncStatus.selectedVisibility = profile.duplicateVisibility
+    }
+
+    private func uploadAvatar(from item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let image = UIImage(data: data),
+              let resized = image.resizedForAvatar(maxDimension: 512),
+              let jpegData = resized.jpegData(compressionQuality: 0.82) else {
+            return
+        }
+
+        avatarPreviewImage = resized
+        await accountStore.uploadAvatar(imageData: jpegData)
+    }
 }
 
 @MainActor
@@ -264,5 +417,32 @@ private struct AccountPanel<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .stickerCard()
+    }
+}
+
+private extension UIImage {
+    func resizedForAvatar(maxDimension: CGFloat) -> UIImage? {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension else {
+            return normalized()
+        }
+
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            normalized()?.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+
+    func normalized() -> UIImage? {
+        guard imageOrientation != .up else { return self }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 }

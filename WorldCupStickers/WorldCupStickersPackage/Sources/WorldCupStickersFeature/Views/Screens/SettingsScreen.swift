@@ -12,6 +12,12 @@ struct SettingsScreen: View {
     @State private var isAccountSheetPresented = false
     @State private var isExportSheetPresented = false
     @State private var isImportSheetPresented = false
+    @State private var didCopyProfileLink = false
+    @State private var visibilitySaveTask: Task<Void, Never>?
+    @State private var isDeleteAccountConfirmPresented = false
+    @State private var isDeleteAllDataConfirmPresented = false
+    @State private var isDeletingData = false
+    @State private var dataActionMessage: String?
 
     var body: some View {
         @Bindable var syncStatus = syncStatus
@@ -56,6 +62,16 @@ struct SettingsScreen: View {
 
                         Text(syncStatus.selectedVisibility.summary)
                             .foregroundStyle(.secondary)
+
+                        if case .signedIn = accountStore.state {
+                            Label("Saved to your profile automatically.", systemImage: "checkmark.icloud.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.stickerTeal)
+                        } else {
+                            Text("Sign in to persist this setting to profile sharing.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     SettingsCard(title: "Fast mode", systemImage: "bolt.fill") {
@@ -115,13 +131,49 @@ struct SettingsScreen: View {
                     }
 
                     SettingsCard(title: "Share profile", systemImage: "link.circle") {
-                        LabeledContent("Web preview", value: "https://stickers.example.com/u/your-handle")
-                        Label("Universal Links are scaffolded for the web app", systemImage: "link")
+                        shareProfileContent
+                    }
+
+                    SettingsCard(title: "Data", systemImage: "trash") {
+                        if isDeletingData {
+                            ProgressView("Deleting data...")
+                                .tint(.stickerTeal)
+                        }
+
+                        Button(role: .destructive) {
+                            isDeleteAccountConfirmPresented = true
+                        } label: {
+                            Label("Delete account", systemImage: "person.crop.circle.badge.xmark")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!isSignedIn || isDeletingData)
+
+                        Text("Deletes your Supabase account, cloud collection, profile, avatar, friends, and exchange data. Your local album stays on this phone.")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        Button(role: .destructive) {
+                            isDeleteAllDataConfirmPresented = true
+                        } label: {
+                            Label("Delete all data", systemImage: "trash.slash")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .disabled(isDeletingData)
+
+                        Text("Deletes cloud data if signed in, then clears all local stickers and pending sync mutations. This cannot be undone.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if let dataActionMessage {
+                            Text(dataActionMessage)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.stickerTeal)
+                        }
                     }
 
                     SettingsCard(title: "Roadmap", systemImage: "point.3.connected.trianglepath.dotted") {
-                        RoadmapRow(title: "Email magic link sign-in", systemImage: "envelope.badge")
+                        RoadmapRow(title: "Deploy sstikr.com preview", systemImage: "globe")
                         RoadmapRow(title: "Friends and mutuals", systemImage: "person.2.fill")
                         RoadmapRow(title: "Duplicate comparison", systemImage: "arrow.left.arrow.right")
                         RoadmapRow(title: "Exchange requests", systemImage: "shippingbox.fill")
@@ -136,6 +188,30 @@ struct SettingsScreen: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("Sticker artwork will reload as it appears.")
+            }
+            .confirmationDialog(
+                "Delete cloud account?",
+                isPresented: $isDeleteAccountConfirmPresented,
+                titleVisibility: .visible
+            ) {
+                Button("Delete account", role: .destructive) {
+                    deleteAccountOnly()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes your Supabase user, cloud collection, profile, avatar, friends, and exchange data. Your local album remains on this phone.")
+            }
+            .confirmationDialog(
+                "Delete all sticker data?",
+                isPresented: $isDeleteAllDataConfirmPresented,
+                titleVisibility: .visible
+            ) {
+                Button("Delete all data", role: .destructive) {
+                    deleteAllData()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes your cloud account if signed in, then clears every local sticker and pending sync mutation on this phone.")
             }
             .sheet(isPresented: $isAccountSheetPresented) {
                 AccountSheet()
@@ -153,7 +229,28 @@ struct SettingsScreen: View {
                     importCollection(text)
                 }
             }
+            .task {
+                applyProfileVisibility()
+            }
+            .onChange(of: accountStore.profile) { _, profile in
+                guard let profile else { return }
+                applyProfileVisibility(profile)
+            }
+            .onChange(of: syncStatus.selectedVisibility) { _, visibility in
+                guard case .signedIn = accountStore.state else { return }
+                visibilitySaveTask?.cancel()
+                visibilitySaveTask = Task {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                    await accountStore.saveDuplicateVisibility(visibility)
+                }
+            }
         }
+    }
+
+    private func applyProfileVisibility(_ profile: UserProfile? = nil) {
+        guard let profile = profile ?? accountStore.profile else { return }
+        syncStatus.selectedVisibility = profile.duplicateVisibility
     }
 
     @ViewBuilder
@@ -185,6 +282,65 @@ struct SettingsScreen: View {
         }
     }
 
+    private var isSignedIn: Bool {
+        if case .signedIn = accountStore.state {
+            return true
+        }
+        return false
+    }
+
+    @ViewBuilder
+    private var shareProfileContent: some View {
+        if case .signedIn = accountStore.state, let profile = accountStore.profile {
+            LabeledContent("Web preview", value: profile.shareURL.absoluteString)
+                .font(.caption)
+                .textSelection(.enabled)
+
+            Text("Your duplicate visibility controls what the web preview can show.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                ShareLink(item: profile.shareURL) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.stickerTeal)
+
+                Button {
+                    UIPasteboard.general.string = profile.shareURL.absoluteString
+                    withAnimation { didCopyProfileLink = true }
+                } label: {
+                    Label(didCopyProfileLink ? "Copied" : "Copy", systemImage: didCopyProfileLink ? "checkmark.circle.fill" : "doc.on.doc")
+                }
+                .buttonStyle(.bordered)
+                .tint(.stickerTeal)
+            }
+        } else if case .signedIn = accountStore.state {
+            Label("Profile is loading", systemImage: "clock")
+                .foregroundStyle(.secondary)
+
+            Button {
+                Task { await accountStore.refreshProfile() }
+            } label: {
+                Label("Refresh profile", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+            .tint(.stickerTeal)
+        } else {
+            Text("Sign in and set a username to create your sstikr.com profile link.")
+                .foregroundStyle(.secondary)
+
+            Button {
+                isAccountSheetPresented = true
+            } label: {
+                Label("Open account", systemImage: "person.crop.circle")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.stickerTeal)
+        }
+    }
+
     private func importCollection(_ text: String) {
         guard let data = CollectionTransfer.parse(text) else { return }
         do {
@@ -195,6 +351,51 @@ struct SettingsScreen: View {
             )
         } catch {
             // Silent failure -- the sheet handles its own error display
+        }
+    }
+
+    private func deleteAccountOnly() {
+        Task {
+            isDeletingData = true
+            dataActionMessage = nil
+            defer { isDeletingData = false }
+
+            guard await accountStore.deleteCloudAccount() else {
+                dataActionMessage = accountStore.lastError ?? "Could not delete cloud account."
+                return
+            }
+
+            do {
+                let keptCount = try CollectionWriter.resetCloudSyncMetadata(context: modelContext)
+                try modelContext.save()
+                dataActionMessage = "Cloud account deleted. Kept \(keptCount) local stickers offline."
+            } catch {
+                dataActionMessage = "Cloud account deleted, but local sync metadata could not be reset."
+            }
+        }
+    }
+
+    private func deleteAllData() {
+        Task {
+            isDeletingData = true
+            dataActionMessage = nil
+            defer { isDeletingData = false }
+
+            if isSignedIn {
+                guard await accountStore.deleteCloudAccount() else {
+                    dataActionMessage = accountStore.lastError ?? "Could not delete cloud account."
+                    return
+                }
+            }
+
+            do {
+                let result = try CollectionWriter.clearLocalData(context: modelContext)
+                try modelContext.save()
+                ImageCache.clearAll()
+                dataActionMessage = "Deleted \(result.ownedStickerCount) local stickers and cleared sync history."
+            } catch {
+                dataActionMessage = "Could not delete local sticker data."
+            }
         }
     }
 }

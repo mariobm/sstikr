@@ -7,7 +7,7 @@
 // Project Identity
 // ==========================================
 PRODUCT_NAME = WorldCupStickers
-PRODUCT_DISPLAY_NAME = World Cup Stickers
+PRODUCT_DISPLAY_NAME = Sstikr
 PRODUCT_BUNDLE_IDENTIFIER = com.sstikr.worldcupstickers
 MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
