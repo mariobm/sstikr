@@ -31,11 +31,6 @@ private struct RootTabView: View {
                     Label("Scan", systemImage: "camera.viewfinder")
                 }
 
-            TeamsScreen()
-                .tabItem {
-                    Label("Teams", systemImage: "flag.2.crossed.fill")
-                }
-
             SettingsScreen()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")

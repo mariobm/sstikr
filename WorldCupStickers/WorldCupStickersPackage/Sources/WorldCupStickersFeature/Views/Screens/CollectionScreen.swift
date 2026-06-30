@@ -9,24 +9,26 @@ struct CollectionScreen: View {
     @Query(sort: \OwnedSticker.updatedAt, order: .reverse) private var ownedStickers: [OwnedSticker]
     @State private var searchText = ""
     @State private var filter: CollectionFilter = .all
-    @State private var selectedGroup: String?
     @State private var editError: String?
     @State private var splashTeamCode: String?
     @State private var hasInitializedCompletionTracking = false
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    header
-                    groupStrip
-                    filterPicker
-                    stickerGrid
+            SearchStateReader { isSearching in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if !isSearchActive(isSearching: isSearching) {
+                            header
+                        }
+                        filterPicker
+                        collectionContent(isSearching: isSearching)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 20)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 20)
+                .background(StickerBackdrop())
             }
-            .background(StickerBackdrop())
             .navigationTitle("Collection")
             .toolbar(splashTeamCode != nil ? .hidden : .automatic, for: .navigationBar)
             .searchable(text: $searchText, prompt: "Search team, player, or code")
@@ -64,6 +66,10 @@ struct CollectionScreen: View {
         }
     }
 
+    private func isSearchActive(isSearching: Bool) -> Bool {
+        isSearching || !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var header: some View {
         let summary = catalog.summary(for: ownedStickers)
 
@@ -98,34 +104,6 @@ struct CollectionScreen: View {
         .accessibilityIdentifier("collectionSummary")
     }
 
-    private var groupStrip: some View {
-        let progressByGroup = groupProgressByGroup()
-
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                GroupFilterChip(
-                    title: "All",
-                    subtitle: "\(catalog.teams.count) teams",
-                    isSelected: selectedGroup == nil
-                ) {
-                    selectedGroup = nil
-                }
-
-                ForEach(groupCodes, id: \.self) { groupCode in
-                    GroupFilterChip(
-                        title: groupTitle(groupCode),
-                        subtitle: (progressByGroup[groupCode] ?? 0).formatted(.percent.precision(.fractionLength(0))),
-                        isSelected: selectedGroup == groupCode
-                    ) {
-                        selectedGroup = groupCode
-                    }
-                }
-            }
-            .padding(.horizontal, 1)
-        }
-        .accessibilityIdentifier("groupFilterStrip")
-    }
-
     private var filterPicker: some View {
         Picker("Filter", selection: $filter) {
             ForEach(CollectionFilter.allCases) { filter in
@@ -134,6 +112,40 @@ struct CollectionScreen: View {
         }
         .pickerStyle(.segmented)
         .accessibilityIdentifier("collectionFilter")
+    }
+
+    @ViewBuilder
+    private func collectionContent(isSearching: Bool) -> some View {
+        switch filter {
+        case .all:
+            if isSearchActive(isSearching: isSearching) {
+                stickerGrid
+            } else {
+                teamProgressList
+            }
+        case .missing, .duplicates:
+            stickerGrid
+        }
+    }
+
+    private var teamProgressList: some View {
+        let rows = filteredTeamProgress()
+
+        return LazyVStack(spacing: 8) {
+            ForEach(rows) { progress in
+                NavigationLink {
+                    TeamDetailScreen(progress: progress)
+                } label: {
+                    TeamProgressRow(progress: progress)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("collectionTeamRow_\(progress.team.code)")
+            }
+        }
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 
     private var stickerGrid: some View {
@@ -166,12 +178,33 @@ struct CollectionScreen: View {
             guard let team = catalog.team(for: sticker.teamCode) else { return false }
             let owned = ownedByID[sticker.id]
             let matchesFilter = filter.matches(quantity: owned?.quantity ?? 0)
-            let matchesGroup = selectedGroup == nil || team.groupCode == selectedGroup
             let matchesSearch = searchText.isEmpty ||
                 team.name.localizedCaseInsensitiveContains(searchText) ||
                 sticker.name.localizedCaseInsensitiveContains(searchText) ||
                 sticker.displayCode.localizedCaseInsensitiveContains(searchText)
-            return matchesFilter && matchesGroup && matchesSearch
+            return matchesFilter && matchesSearch
+        }
+    }
+
+    private func filteredTeamProgress() -> [TeamProgress] {
+        catalog.progressByTeam(for: ownedStickers)
+            .filter { progress in
+                matchesSearch(progress)
+            }
+            .sorted { $0.team.sortOrder < $1.team.sortOrder }
+    }
+
+    private func matchesSearch(_ progress: TeamProgress) -> Bool {
+        guard !searchText.isEmpty else { return true }
+        if progress.team.name.localizedCaseInsensitiveContains(searchText) ||
+            progress.team.code.localizedCaseInsensitiveContains(searchText) ||
+            progress.team.groupTitle.localizedCaseInsensitiveContains(searchText) {
+            return true
+        }
+
+        return catalog.stickers(for: progress.team.code).contains { sticker in
+            sticker.name.localizedCaseInsensitiveContains(searchText) ||
+                sticker.displayCode.localizedCaseInsensitiveContains(searchText)
         }
     }
 
@@ -185,35 +218,6 @@ struct CollectionScreen: View {
                 .filter { $0.ownedUniqueCount >= $0.team.stickerCount }
                 .map(\.team.code)
         )
-    }
-
-    private var groupCodes: [String] {
-        var seen: Set<String> = []
-        return catalog.teams
-            .sorted { $0.sortOrder < $1.sortOrder }
-            .compactMap { team in
-                guard seen.insert(team.groupCode).inserted else { return nil }
-                return team.groupCode
-            }
-    }
-
-    private func groupProgressByGroup() -> [String: Double] {
-        let progressByTeam = catalog.progressByTeam(for: ownedStickers)
-        let grouped = Dictionary(grouping: progressByTeam) { $0.team.groupCode }
-
-        return grouped.mapValues { progress in
-            let total = progress.reduce(0) { $0 + $1.team.stickerCount }
-            guard total > 0 else { return 0 }
-            let owned = progress.reduce(0) { $0 + $1.ownedUniqueCount }
-            return Double(owned) / Double(total)
-        }
-    }
-
-    private func groupTitle(_ groupCode: String) -> String {
-        if groupCode.count == 1 {
-            return "Group \(groupCode)"
-        }
-        return groupCode
     }
 
     private func add(_ sticker: StickerDefinition, existing: OwnedSticker?) {
@@ -247,6 +251,16 @@ struct CollectionScreen: View {
 }
 
 @MainActor
+private struct SearchStateReader<Content: View>: View {
+    @Environment(\.isSearching) private var isSearching
+    let content: (Bool) -> Content
+
+    var body: some View {
+        content(isSearching)
+    }
+}
+
+@MainActor
 private struct StatPill: View {
     let title: String
     let value: String
@@ -269,47 +283,8 @@ private struct StatPill: View {
     }
 }
 
-@MainActor
-private struct GroupFilterChip: View {
-    let title: String
-    let subtitle: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-                Text(subtitle)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.8) : Color.secondary)
-            }
-            .frame(width: 96, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                isSelected ? AnyShapeStyle(Color.stickerTeal) : AnyShapeStyle(Color.cardSurface),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .overlay {
-                if !isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.hairline, lineWidth: 1)
-                }
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.stickerInk)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title), \(subtitle)")
-    }
-}
-
 private enum CollectionFilter: String, CaseIterable, Identifiable {
     case all
-    case owned
     case missing
     case duplicates
 
@@ -318,7 +293,6 @@ private enum CollectionFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all: "All"
-        case .owned: "Owned"
         case .missing: "Missing"
         case .duplicates: "Dupes"
         }
@@ -327,7 +301,6 @@ private enum CollectionFilter: String, CaseIterable, Identifiable {
     func matches(quantity: Int) -> Bool {
         switch self {
         case .all: true
-        case .owned: quantity > 0
         case .missing: quantity == 0
         case .duplicates: quantity > 1
         }

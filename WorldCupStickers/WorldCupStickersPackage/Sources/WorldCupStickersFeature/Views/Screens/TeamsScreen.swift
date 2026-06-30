@@ -77,7 +77,7 @@ private struct TeamGroupSection: View {
 }
 
 @MainActor
-private struct TeamProgressRow: View {
+struct TeamProgressRow: View {
     let progress: TeamProgress
 
     var body: some View {
@@ -111,7 +111,7 @@ private struct TeamProgressRow: View {
 }
 
 @MainActor
-private struct TeamDetailScreen: View {
+struct TeamDetailScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
     @Environment(SyncStatusStore.self) private var syncStatus
     @Environment(\.modelContext) private var modelContext
