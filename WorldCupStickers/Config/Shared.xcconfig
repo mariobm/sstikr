@@ -28,6 +28,17 @@ GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait
 INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 INFOPLIST_KEY_NSCameraUsageDescription = Scan the top-right sticker code on the back of each World Cup sticker before you confirm it.
+INFOPLIST_KEY_SUPABASE_URL = $(SUPABASE_URL)
+INFOPLIST_KEY_SUPABASE_PUBLISHABLE_KEY = $(SUPABASE_PUBLISHABLE_KEY)
+INFOPLIST_KEY_SUPABASE_REDIRECT_URL = $(SUPABASE_REDIRECT_URL)
+
+// ==========================================
+// Backend Configuration
+// ==========================================
+// Keep these empty in git unless you explicitly want a public client config baked into the app build.
+SUPABASE_URL =
+SUPABASE_PUBLISHABLE_KEY =
+SUPABASE_REDIRECT_URL =
 
 // ==========================================
 // Entitlements

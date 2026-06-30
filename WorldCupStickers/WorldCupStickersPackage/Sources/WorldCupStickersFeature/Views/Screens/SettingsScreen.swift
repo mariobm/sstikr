@@ -3,7 +3,9 @@ import SwiftUI
 @MainActor
 struct SettingsScreen: View {
     @Environment(SyncStatusStore.self) private var syncStatus
+    @Environment(SupabaseAccountStore.self) private var accountStore
     @State private var didClearImageCache = false
+    @State private var isAccountSheetPresented = false
 
     var body: some View {
         @Bindable var syncStatus = syncStatus
@@ -26,6 +28,16 @@ struct SettingsScreen: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+
+                        accountStatus
+
+                        Button {
+                            isAccountSheetPresented = true
+                        } label: {
+                            Label(accountButtonTitle, systemImage: "person.crop.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.stickerTeal)
                     }
 
                     SettingsCard(title: "Duplicate visibility", systemImage: "person.2.badge.gearshape") {
@@ -97,6 +109,38 @@ struct SettingsScreen: View {
             } message: {
                 Text("Sticker artwork will reload as it appears.")
             }
+            .sheet(isPresented: $isAccountSheetPresented) {
+                AccountSheet()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var accountStatus: some View {
+        switch accountStore.state {
+        case .notConfigured:
+            Label("Account sync unavailable", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
+        case .signedOut:
+            Label("Not signed in", systemImage: "person.crop.circle")
+                .foregroundStyle(.secondary)
+        case .codeSent(let email):
+            Label("Code sent to \(email)", systemImage: "envelope.badge")
+                .foregroundStyle(Color.stickerTeal)
+        case .signedIn(let account):
+            Label(account.email ?? "Signed in", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(Color.stickerTeal)
+        }
+    }
+
+    private var accountButtonTitle: String {
+        switch accountStore.state {
+        case .signedIn:
+            "Manage account"
+        case .codeSent:
+            "Enter code"
+        case .notConfigured, .signedOut:
+            "Sign in"
         }
     }
 }

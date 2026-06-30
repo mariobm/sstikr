@@ -4,16 +4,23 @@ import SwiftUI
 @MainActor
 public struct ContentView: View {
     @State private var catalogStore = StickerCatalogStore()
-    @State private var syncStatus = SyncStatusStore()
+    @State private var syncStatus: SyncStatusStore
+    @State private var accountStore: SupabaseAccountStore
 
-    public init() {}
+    public init() {
+        let configuration = SupabaseConfiguration.fromEnvironment()
+        _syncStatus = State(initialValue: SyncStatusStore(configuration: configuration))
+        _accountStore = State(initialValue: SupabaseAccountStore(configuration: configuration))
+    }
 
     public var body: some View {
         RootTabView()
             .environment(catalogStore)
             .environment(syncStatus)
+            .environment(accountStore)
             .task {
                 await catalogStore.load()
+                await accountStore.refreshSession()
             }
     }
 }

@@ -5,12 +5,14 @@ import SwiftUI
 struct CollectionScreen: View {
     @Environment(StickerCatalogStore.self) private var catalog
     @Environment(SyncStatusStore.self) private var syncStatus
+    @Environment(SupabaseAccountStore.self) private var accountStore
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \OwnedSticker.updatedAt, order: .reverse) private var ownedStickers: [OwnedSticker]
     @State private var searchText = ""
     @State private var filter: CollectionFilter = .all
     @State private var editError: String?
     @State private var splashTeamCode: String?
+    @State private var isAccountSheetPresented = false
     @State private var hasInitializedCompletionTracking = false
 
     var body: some View {
@@ -31,7 +33,20 @@ struct CollectionScreen: View {
             }
             .navigationTitle("Collection")
             .toolbar(splashTeamCode != nil ? .hidden : .automatic, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isAccountSheetPresented = true
+                    } label: {
+                        Image(systemName: accountIconName)
+                    }
+                    .accessibilityLabel("Account")
+                }
+            }
             .searchable(text: $searchText, prompt: "Search team, player, or code")
+            .sheet(isPresented: $isAccountSheetPresented) {
+                AccountSheet()
+            }
             .alert(
                 "Could not update sticker",
                 isPresented: Binding(
@@ -63,6 +78,19 @@ struct CollectionScreen: View {
                     splashTeamCode = teamCode
                 }
             }
+        }
+    }
+
+    private var accountIconName: String {
+        switch accountStore.state {
+        case .signedIn:
+            "person.crop.circle.fill.badge.checkmark"
+        case .codeSent:
+            "person.crop.circle.badge.clock"
+        case .notConfigured:
+            "person.crop.circle.badge.exclamationmark"
+        case .signedOut:
+            "person.crop.circle"
         }
     }
 

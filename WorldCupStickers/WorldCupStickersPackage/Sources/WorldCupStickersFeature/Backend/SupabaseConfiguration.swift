@@ -13,10 +13,15 @@ public struct SupabaseConfiguration: Equatable, Sendable {
 
     public static func fromEnvironment() -> SupabaseConfiguration? {
         let environment = ProcessInfo.processInfo.environment
-        guard let urlString = environment["SUPABASE_URL"],
-              let key = environment["SUPABASE_PUBLISHABLE_KEY"],
+        let bundle = Bundle.main
+        let urlString = environment["SUPABASE_URL"] ?? bundle.infoString(forKey: "SUPABASE_URL")
+        let key = environment["SUPABASE_PUBLISHABLE_KEY"] ?? bundle.infoString(forKey: "SUPABASE_PUBLISHABLE_KEY")
+        let redirectString = environment["SUPABASE_REDIRECT_URL"] ?? bundle.infoString(forKey: "SUPABASE_REDIRECT_URL") ?? "worldcupstickers://auth"
+
+        guard let urlString,
+              let key,
               let projectURL = URL(string: urlString),
-              let redirectURL = URL(string: environment["SUPABASE_REDIRECT_URL"] ?? "worldcupstickers://auth") else {
+              let redirectURL = URL(string: redirectString) else {
             return nil
         }
 
@@ -48,5 +53,13 @@ public final class SyncStatusStore {
         } else {
             self.phaseStatus = .localOnly
         }
+    }
+}
+
+private extension Bundle {
+    func infoString(forKey key: String) -> String? {
+        guard let value = object(forInfoDictionaryKey: key) as? String else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
