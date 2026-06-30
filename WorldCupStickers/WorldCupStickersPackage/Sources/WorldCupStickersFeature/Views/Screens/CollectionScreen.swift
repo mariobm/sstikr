@@ -113,7 +113,7 @@ struct CollectionScreen: View {
 
                 ForEach(groupCodes, id: \.self) { groupCode in
                     GroupFilterChip(
-                        title: "Group \(groupCode)",
+                        title: groupTitle(groupCode),
                         subtitle: (progressByGroup[groupCode] ?? 0).formatted(.percent.precision(.fractionLength(0))),
                         isSelected: selectedGroup == groupCode
                     ) {
@@ -188,7 +188,13 @@ struct CollectionScreen: View {
     }
 
     private var groupCodes: [String] {
-        Array(Set(catalog.teams.map(\.groupCode))).sorted()
+        var seen: Set<String> = []
+        return catalog.teams
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .compactMap { team in
+                guard seen.insert(team.groupCode).inserted else { return nil }
+                return team.groupCode
+            }
     }
 
     private func groupProgressByGroup() -> [String: Double] {
@@ -201,6 +207,13 @@ struct CollectionScreen: View {
             let owned = progress.reduce(0) { $0 + $1.ownedUniqueCount }
             return Double(owned) / Double(total)
         }
+    }
+
+    private func groupTitle(_ groupCode: String) -> String {
+        if groupCode.count == 1 {
+            return "Group \(groupCode)"
+        }
+        return groupCode
     }
 
     private func add(_ sticker: StickerDefinition, existing: OwnedSticker?) {
@@ -268,6 +281,8 @@ private struct GroupFilterChip: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                 Text(subtitle)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(isSelected ? Color.white.opacity(0.8) : Color.secondary)

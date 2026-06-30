@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.29-avif-0.5x",
+  "version": "2026.06.29-avif-0.5x-noncountry",
   "source": "2026EUAMEXCAN - Para Cortar.pdf, extracted 2026-06-28",
   "stickersPerTeam": 20,
   "teams": [
@@ -530,13 +530,46 @@
       "secondaryColor": "#F0A202",
       "sortOrder": 48,
       "stickerCount": 20
+    },
+    {
+      "id": "FWC",
+      "code": "FWC",
+      "name": "FIFA World Cup",
+      "groupCode": "FWC",
+      "flag": "🏆",
+      "primaryColor": "#1D5FA7",
+      "secondaryColor": "#00A6A6",
+      "sortOrder": 49,
+      "stickerCount": 19
+    },
+    {
+      "id": "CC",
+      "code": "CC",
+      "name": "Coca-Cola",
+      "groupCode": "CC",
+      "flag": "🥤",
+      "primaryColor": "#D6264D",
+      "secondaryColor": "#E7442E",
+      "sortOrder": 50,
+      "stickerCount": 14
+    },
+    {
+      "id": "00",
+      "code": "00",
+      "name": "Special",
+      "groupCode": "Special",
+      "flag": "★",
+      "primaryColor": "#6B7280",
+      "secondaryColor": "#111827",
+      "sortOrder": 51,
+      "stickerCount": 1
     }
   ],
   "stickers": [
     {
       "id": "00",
       "teamCode": "00",
-      "teamName": "Album",
+      "teamName": "Special",
       "number": 0,
       "displayCode": "00",
       "name": "PANINI",

@@ -28,7 +28,7 @@ public struct TeamDefinition: Decodable, Hashable, Identifiable, Sendable {
     public let stickerCount: Int
 
     public var groupTitle: String {
-        "Group \(groupCode)"
+        groupCode.count == 1 ? "Group \(groupCode)" : groupCode
     }
 }
 

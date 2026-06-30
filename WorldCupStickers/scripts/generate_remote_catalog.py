@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 
-CATALOG_VERSION = "2026.06.29-avif-0.5x"
+CATALOG_VERSION = "2026.06.29-avif-0.5x-noncountry"
 IMAGE_VARIANT_SUFFIX = "@0.5x"
 DEFAULT_BUCKET = "world-cup-stickers"
 COUNTRY_RE = re.compile(r"^[A-Z]{3}$")
@@ -47,6 +47,44 @@ GROUP_COLORS = {
     "J": ("#6BB7D6", "#F2B705"),
     "K": ("#0E7C66", "#C31E39"),
     "L": ("#3851A3", "#F0A202"),
+}
+
+SPECIAL_TEAMS = [
+    {
+        "id": "FWC",
+        "code": "FWC",
+        "name": "FIFA World Cup",
+        "groupCode": "FWC",
+        "flag": "🏆",
+        "primaryColor": "#1D5FA7",
+        "secondaryColor": "#00A6A6",
+        "stickerCount": 19,
+    },
+    {
+        "id": "CC",
+        "code": "CC",
+        "name": "Coca-Cola",
+        "groupCode": "CC",
+        "flag": "🥤",
+        "primaryColor": "#D6264D",
+        "secondaryColor": "#E7442E",
+        "stickerCount": 14,
+    },
+    {
+        "id": "00",
+        "code": "00",
+        "name": "Special",
+        "groupCode": "Special",
+        "flag": "★",
+        "primaryColor": "#6B7280",
+        "secondaryColor": "#111827",
+        "stickerCount": 1,
+    },
+]
+
+SPECIAL_TEAM_BY_CODE = {
+    team["code"]: team
+    for team in SPECIAL_TEAMS
 }
 
 FLAGS = {
@@ -158,12 +196,33 @@ def collect_team_names(rows: list[dict[str, str]]) -> dict[str, str]:
 def team_name_for(row: dict[str, str], team_names: dict[str, str]) -> str:
     code = row["code"]
     if code == "00":
-        return "Album"
+        return "Special"
     if code == "FWC":
         return "FIFA World Cup"
     if code == "CC":
         return "Coca-Cola"
     return team_names.get(code, row["country"].strip() or code)
+
+
+def group_code_for(code: str) -> str | None:
+    if code in SPECIAL_TEAM_BY_CODE:
+        return str(SPECIAL_TEAM_BY_CODE[code]["groupCode"])
+    return GROUP_BY_CODE.get(code)
+
+
+def flag_for(code: str) -> str | None:
+    if code in SPECIAL_TEAM_BY_CODE:
+        return str(SPECIAL_TEAM_BY_CODE[code]["flag"])
+    return FLAGS.get(code)
+
+
+def colors_for(code: str) -> tuple[str, str]:
+    if code in SPECIAL_TEAM_BY_CODE:
+        team = SPECIAL_TEAM_BY_CODE[code]
+        return str(team["primaryColor"]), str(team["secondaryColor"])
+
+    group_code = GROUP_BY_CODE.get(code)
+    return GROUP_COLORS.get(group_code, ("#6B7280", "#111827"))
 
 
 def team_definitions(rows: list[dict[str, str]], team_names: dict[str, str]) -> list[dict[str, object]]:
@@ -188,6 +247,14 @@ def team_definitions(rows: list[dict[str, str]], team_names: dict[str, str]) -> 
                 "secondaryColor": secondary_color,
                 "sortOrder": index,
                 "stickerCount": 20,
+            }
+        )
+
+    for offset, team in enumerate(SPECIAL_TEAMS, start=1):
+        teams.append(
+            {
+                **team,
+                "sortOrder": len(seen) + offset,
             }
         )
     return teams
@@ -237,8 +304,8 @@ def write_seed_sql(path: Path, rows: list[dict[str, str]], public_base_url: str 
         number = row["number"]
         key = object_key(code, number)
         image_url = f"{public_base_url.rstrip('/')}/{key}" if public_base_url else None
-        group_code = GROUP_BY_CODE.get(code)
-        primary_color, secondary_color = GROUP_COLORS.get(group_code, ("#6B7280", "#111827"))
+        group_code = group_code_for(code)
+        primary_color, secondary_color = colors_for(code)
         values.append(
             "  ("
             + ", ".join(
@@ -253,7 +320,7 @@ def write_seed_sql(path: Path, rows: list[dict[str, str]], public_base_url: str 
                     sql_quote(key),
                     sql_quote(image_url),
                     sql_quote(group_code),
-                    sql_quote(FLAGS.get(code)),
+                    sql_quote(flag_for(code)),
                     sql_quote(primary_color),
                     sql_quote(secondary_color),
                     str(int(row["global_index"]) + 1),

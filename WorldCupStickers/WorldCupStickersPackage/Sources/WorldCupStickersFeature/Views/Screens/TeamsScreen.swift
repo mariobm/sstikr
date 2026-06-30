@@ -33,7 +33,7 @@ struct TeamsScreen: View {
                     teams: rows.sorted { $0.team.sortOrder < $1.team.sortOrder }
                 )
             }
-            .sorted { $0.code < $1.code }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
 }
 
@@ -45,7 +45,7 @@ private struct TeamGroupSection: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Group \(section.code)")
+                    Text(section.title)
                         .font(.system(.title3, design: .rounded, weight: .bold))
                         .foregroundStyle(Color.stickerInk)
                     Text("\(section.ownedUniqueCount) of \(section.totalCount) stickers")
@@ -322,6 +322,17 @@ private struct TeamDetailScreen: View {
 private struct TeamGroupProgress: Sendable {
     let code: String
     let teams: [TeamProgress]
+
+    var title: String {
+        if code.count == 1 {
+            return "Group \(code)"
+        }
+        return code
+    }
+
+    var sortOrder: Int {
+        teams.map(\.team.sortOrder).min() ?? .max
+    }
 
     var totalCount: Int {
         teams.reduce(0) { $0 + $1.team.stickerCount }

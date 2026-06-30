@@ -50,22 +50,8 @@ struct StickerTile: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 8) {
-                    if !stripOverlayInfo {
-                        CountryBadge(team: team, fallbackCode: definition.teamCode, compact: true)
-                    }
+                    stickerNumberBadge
                     Spacer(minLength: 4)
-                    Text("\(definition.number)")
-                        .font(.subheadline.weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(quantity > 0 ? Color.white : Color.stickerInk)
-                        .padding(.horizontal, quantity > 0 ? 7 : 0)
-                        .padding(.vertical, quantity > 0 ? 4 : 0)
-                        .background {
-                            if quantity > 0 {
-                                Capsule()
-                                    .fill(Color.black.opacity(0.38))
-                            }
-                        }
                 }
 
                 Spacer(minLength: 0)
@@ -175,6 +161,23 @@ struct StickerTile: View {
         case 1: "owned"
         default: "\(quantity) copies"
         }
+    }
+
+    private var stickerNumberBadge: some View {
+        Text("#\(definition.number)")
+            .font(.caption.weight(.bold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .foregroundStyle(quantity > 0 ? Color.white : Color.stickerInk)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                quantity > 0
+                    ? Color.black.opacity(0.42)
+                    : Color.cardSurface.opacity(0.92),
+                in: Capsule()
+            )
+            .accessibilityHidden(true)
     }
 
     private var editControls: some View {

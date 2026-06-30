@@ -46,7 +46,7 @@ struct ScannerScreen: View {
                     return
                 }
 
-                if recentScans.contains(definition.id) {
+                if syncStatus.fastMode && recentScans.contains(definition.id) {
                     scanner.discardStableResult(
                         message: "Already scanned \(definition.displayCode). Looking for the next sticker."
                     )
@@ -299,30 +299,14 @@ private struct ScanConfirmationSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Detected") {
+                Section {
                     if let definition = detectedDefinition,
                        let team = detectedTeam {
-                        HStack(spacing: 12) {
-                            CountryBadge(team: team, fallbackCode: definition.teamCode)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(team.name)
-                                    .font(.headline)
-                                Text(team.groupTitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        detectedHeader(definition: definition, team: team)
 
                         stickerImage(definition)
                     }
 
-                    HStack {
-                        Text("Code")
-                        Spacer()
-                        Text(result.displayCode)
-                            .font(.title3.weight(.bold))
-                            .monospacedDigit()
-                    }
                     HStack {
                         Text("Match")
                         Spacer()
@@ -331,7 +315,7 @@ private struct ScanConfirmationSheet: View {
                     }
                 }
 
-                Section("Confirm or edit") {
+                Section {
                     TextField("Country code", text: $teamCode)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
@@ -354,7 +338,6 @@ private struct ScanConfirmationSheet: View {
                     }
                 }
             }
-            .navigationTitle("Confirm Sticker")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Retry") {
@@ -373,6 +356,28 @@ private struct ScanConfirmationSheet: View {
                 }
             }
         }
+    }
+
+    private func detectedHeader(definition: StickerDefinition, team: TeamDefinition) -> some View {
+        HStack(spacing: 12) {
+            Text(team.flag)
+                .font(.system(size: 24))
+                .frame(width: 42, height: 42)
+                .background(Color.cardSurface.opacity(0.92), in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(definition.displayCode)
+                    .font(.title3.weight(.bold))
+                    .monospacedDigit()
+                Text(team.name)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(team.name), \(definition.displayCode)")
     }
 
     @ViewBuilder
