@@ -63,9 +63,10 @@ public final class StickerCatalogStore {
     }
 
     public func summary(for ownedStickers: [OwnedSticker]) -> CollectionSummary {
-        let ownedUniqueCount = ownedStickers.filter { $0.quantity > 0 }.count
-        let duplicateCount = ownedStickers.reduce(0) { partial, sticker in
-            partial + max(sticker.quantity - 1, 0)
+        let quantitiesByStickerID = catalogQuantitiesByStickerID(for: ownedStickers)
+        let ownedUniqueCount = quantitiesByStickerID.count
+        let duplicateCount = quantitiesByStickerID.values.reduce(0) { partial, quantity in
+            partial + max(quantity - 1, 0)
         }
 
         return CollectionSummary(
@@ -77,12 +78,14 @@ public final class StickerCatalogStore {
 
     public func progressByTeam(for ownedStickers: [OwnedSticker]) -> [TeamProgress] {
         var countsByTeam: [String: (ownedUniqueCount: Int, duplicateCount: Int)] = [:]
+        let quantitiesByStickerID = catalogQuantitiesByStickerID(for: ownedStickers)
 
-        for sticker in ownedStickers where sticker.quantity > 0 {
+        for (stickerID, quantity) in quantitiesByStickerID {
+            guard let sticker = stickersByID[stickerID] else { continue }
             let current = countsByTeam[sticker.teamCode] ?? (ownedUniqueCount: 0, duplicateCount: 0)
             countsByTeam[sticker.teamCode] = (
                 ownedUniqueCount: current.ownedUniqueCount + 1,
-                duplicateCount: current.duplicateCount + max(sticker.quantity - 1, 0)
+                duplicateCount: current.duplicateCount + max(quantity - 1, 0)
             )
         }
 
@@ -100,6 +103,13 @@ public final class StickerCatalogStore {
 
     private static func lookupKey(teamCode: String, number: Int) -> String {
         "\(teamCode.uppercased())-\(number)"
+    }
+
+    private func catalogQuantitiesByStickerID(for ownedStickers: [OwnedSticker]) -> [String: Int] {
+        ownedStickers.reduce(into: [:]) { totals, owned in
+            guard owned.quantity > 0, stickersByID[owned.stickerID] != nil else { return }
+            totals[owned.stickerID, default: 0] += owned.quantity
+        }
     }
 }
 

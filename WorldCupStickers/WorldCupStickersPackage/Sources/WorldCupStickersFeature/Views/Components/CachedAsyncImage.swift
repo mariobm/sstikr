@@ -3,6 +3,8 @@ import UIKit
 
 @MainActor
 final class ImageCache {
+    static let didClearNotification = Notification.Name("ImageCache.didClear")
+
     static let shared: NSCache<NSURL, UIImage> = {
         let cache = NSCache<NSURL, UIImage>()
         cache.countLimit = 1_000
@@ -11,6 +13,12 @@ final class ImageCache {
     }()
 
     private init() {}
+
+    static func clearAll() {
+        shared.removeAllObjects()
+        URLCache.shared.removeAllCachedResponses()
+        NotificationCenter.default.post(name: didClearNotification, object: nil)
+    }
 }
 
 @MainActor
@@ -24,6 +32,11 @@ struct CachedAsyncImage<Content: View>: View {
         content(phase)
             .task(id: url) {
                 await load()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: ImageCache.didClearNotification)) { _ in
+                Task {
+                    await load()
+                }
             }
     }
 

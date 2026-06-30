@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct SettingsScreen: View {
     @Environment(SyncStatusStore.self) private var syncStatus
+    @State private var didClearImageCache = false
 
     var body: some View {
         @Bindable var syncStatus = syncStatus
@@ -60,6 +61,19 @@ struct SettingsScreen: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    SettingsCard(title: "Images", systemImage: "photo.on.rectangle") {
+                        Button("Clear image cache", systemImage: "trash") {
+                            ImageCache.clearAll()
+                            didClearImageCache = true
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.stickerTeal)
+
+                        Text("Reloads sticker images from R2 without touching your collection.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     SettingsCard(title: "Share profile", systemImage: "link.circle") {
                         LabeledContent("Web preview", value: "https://stickers.example.com/u/your-handle")
                         Label("Universal Links are scaffolded for the web app", systemImage: "link")
@@ -78,6 +92,11 @@ struct SettingsScreen: View {
             }
             .background(StickerBackdrop())
             .navigationTitle("Settings")
+            .alert("Image cache cleared", isPresented: $didClearImageCache) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Sticker artwork will reload as it appears.")
+            }
         }
     }
 }

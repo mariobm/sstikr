@@ -48,23 +48,25 @@ struct StickerTile: View {
                 )
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 8) {
-                    stickerNumberBadge
-                    Spacer(minLength: 4)
-                }
+            if quantity > 0 {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 8) {
+                        stickerNumberBadge
+                        Spacer(minLength: 4)
+                    }
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
 
-                if !stripOverlayInfo {
-                    Text(definition.name)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(quantity > 0 ? Color.white : Color.stickerInk)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
+                    if !stripOverlayInfo {
+                        Text(definition.name)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.82)
+                    }
                 }
+                .padding(10)
             }
-            .padding(10)
 
             editControls
         }
@@ -117,7 +119,7 @@ struct StickerTile: View {
                 }
             }
         } else {
-            Color.clear
+            missingArtwork
         }
     }
 
@@ -132,14 +134,74 @@ struct StickerTile: View {
             } else {
                 LinearGradient(
                     colors: [
-                        Color.cardSurface,
-                        (team?.accentColor ?? Color.stickerTeal).opacity(0.07)
+                        missingAccentColor.opacity(0.82),
+                        missingSecondaryColor.opacity(0.68)
                     ],
-                    startPoint: .top,
-                    endPoint: .bottom
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
             }
         }
+    }
+
+    private var missingArtwork: some View {
+        ZStack {
+            Text("26")
+                .font(.system(size: 118, weight: .black, design: .rounded))
+                .foregroundStyle(Color.white.opacity(0.18))
+                .minimumScaleFactor(0.7)
+                .offset(y: -8)
+
+            Rectangle()
+                .fill(missingSecondaryColor.opacity(0.22))
+                .rotationEffect(.degrees(-18))
+                .frame(height: 72)
+                .offset(y: -28)
+
+            VStack(spacing: 14) {
+                Spacer(minLength: 4)
+
+                VStack(spacing: 2) {
+                    Text(team?.code ?? definition.teamCode)
+                        .font(.title3.weight(.black))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+
+                    Text("\(definition.number)")
+                        .font(.system(.title, design: .rounded, weight: .black))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+                .foregroundStyle(missingAccentColor)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 14)
+                .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                Spacer(minLength: 0)
+
+                Text(definition.name)
+                    .font(.caption.weight(.heavy))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.68)
+                    .foregroundStyle(missingAccentColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 11)
+                    .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .padding(.bottom, 34)
+            }
+            .padding(14)
+        }
+    }
+
+    private var missingAccentColor: Color {
+        team?.accentColor ?? .stickerTeal
+    }
+
+    private var missingSecondaryColor: Color {
+        team?.secondaryAccentColor ?? .stickerBlue
     }
 
     private var ownedPlaceholder: some View {

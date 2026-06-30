@@ -27,4 +27,39 @@ struct StickerCatalogTests {
         #expect(catalog.teams.first { $0.code == "00" }?.stickerCount == 1)
         #expect(catalog.teams.allSatisfy { !$0.flag.isEmpty && !$0.primaryColor.isEmpty && !$0.secondaryColor.isEmpty })
     }
+
+    @Test("Summary counts only extra copies as duplicates")
+    @MainActor
+    func summaryCountsOnlyExtraCopiesAsDuplicates() async {
+        let store = StickerCatalogStore()
+        await store.load()
+
+        let summary = store.summary(for: [
+            OwnedSticker(stickerID: "MEX-1", teamCode: "MEX", number: 1, quantity: 5),
+            OwnedSticker(stickerID: "MEX-2", teamCode: "MEX", number: 2, quantity: 1)
+        ])
+
+        #expect(summary.ownedUniqueCount == 2)
+        #expect(summary.duplicateCount == 4)
+    }
+
+    @Test("Summary collapses duplicate local ownership rows")
+    @MainActor
+    func summaryCollapsesDuplicateLocalOwnershipRows() async throws {
+        let store = StickerCatalogStore()
+        await store.load()
+
+        let owned = [
+            OwnedSticker(stickerID: "MEX-1", teamCode: "MEX", number: 1, quantity: 3),
+            OwnedSticker(stickerID: "MEX-1", teamCode: "MEX", number: 1, quantity: 2),
+            OwnedSticker(stickerID: "UNKNOWN-1", teamCode: "UNKNOWN", number: 1, quantity: 10)
+        ]
+        let summary = store.summary(for: owned)
+        let mexicoProgress = try #require(store.progressByTeam(for: owned).first { $0.team.code == "MEX" })
+
+        #expect(summary.ownedUniqueCount == 1)
+        #expect(summary.duplicateCount == 4)
+        #expect(mexicoProgress.ownedUniqueCount == 1)
+        #expect(mexicoProgress.duplicateCount == 4)
+    }
 }

@@ -114,19 +114,50 @@ public struct StickerCodeCatalogMatcher: Sendable {
     private func correctedTeamCode(for teamCode: String, number: Int) -> String? {
         guard let candidates = teamCodesByNumber[number] else { return nil }
 
-        return candidates.first { candidate in
-            Self.hammingDistance(teamCode, candidate) == 1
+        let corrections = candidates.compactMap { candidate -> (code: String, penalty: Double)? in
+            guard let penalty = Self.singleSubstitutionPenalty(observed: teamCode, candidate: candidate) else {
+                return nil
+            }
+            return (candidate, penalty)
         }
+
+        return corrections.min { lhs, rhs in
+            if lhs.penalty == rhs.penalty {
+                return lhs.code < rhs.code
+            }
+            return lhs.penalty < rhs.penalty
+        }?.code
     }
 
     private static func key(teamCode: String, number: Int) -> String {
         "\(teamCode.uppercased())-\(number)"
     }
 
-    private static func hammingDistance(_ lhs: String, _ rhs: String) -> Int {
-        guard lhs.count == rhs.count else { return Int.max }
-        return zip(lhs, rhs).reduce(0) { distance, pair in
-            distance + (pair.0 == pair.1 ? 0 : 1)
+    private static func singleSubstitutionPenalty(observed: String, candidate: String) -> Double? {
+        guard observed.count == candidate.count else { return nil }
+
+        let differences = zip(observed, candidate).filter { $0.0 != $0.1 }
+        guard differences.count == 1, let difference = differences.first else { return nil }
+
+        return substitutionPenalty(observed: difference.0, expected: difference.1)
+    }
+
+    private static func substitutionPenalty(observed: Character, expected: Character) -> Double {
+        let pair = "\(observed)\(expected)"
+
+        switch pair {
+        case "OQ", "QO", "0Q", "Q0":
+            return 0.1
+        case "GC", "CG":
+            return 0.18
+        case "1I", "I1", "LI", "IL":
+            return 0.2
+        case "ON", "NO":
+            return 0.65
+        case "IC", "CI":
+            return 0.75
+        default:
+            return 1
         }
     }
 }

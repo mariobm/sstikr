@@ -72,6 +72,17 @@ struct StickerCodeParserTests {
         #expect(matched.confidence < result.confidence)
     }
 
+    @Test("Catalog matcher prefers likely IRQ correction over alphabetical CRO")
+    func catalogMatcherPrefersLikelyIRQCorrection() throws {
+        let matcher = try makeCatalogCodeMatcher()
+        let result = try #require(StickerCodeParser.parse("IRO 13"))
+        let matched = try #require(matcher.match(result))
+
+        #expect(matched.teamCode == "IRQ")
+        #expect(matched.number == 13)
+        #expect(matched.confidence < result.confidence)
+    }
+
     @Test("Catalog matcher rejects invalid back code")
     func catalogMatcherRejectsInvalidBackCode() throws {
         let matcher = try makeCatalogCodeMatcher()
