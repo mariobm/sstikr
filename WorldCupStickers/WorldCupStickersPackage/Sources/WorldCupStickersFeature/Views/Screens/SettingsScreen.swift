@@ -28,21 +28,6 @@ struct SettingsScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     SettingsCard(title: "Account sync", systemImage: "icloud.and.arrow.up") {
-                        switch syncStatus.phaseStatus {
-                        case .localOnly:
-                            Label("Local-only mode", systemImage: "iphone")
-                                .font(.headline)
-                            Text("Supabase URL and publishable key are not configured yet. Scans are saved locally with sync-ready mutation records.")
-                                .foregroundStyle(.secondary)
-                        case .configured(let configuration):
-                            Label("Supabase configured", systemImage: "checkmark.icloud.fill")
-                                .foregroundStyle(Color.stickerTeal)
-                                .font(.headline)
-                            Text(configuration.projectURL.absoluteString)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
                         accountStatus
 
                         Button {
@@ -200,15 +185,8 @@ struct SettingsScreen: View {
                         if let dataActionMessage {
                             Text(dataActionMessage)
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.stickerTeal)
+                            .foregroundStyle(Color.stickerTeal)
                         }
-                    }
-
-                    SettingsCard(title: "Roadmap", systemImage: "point.3.connected.trianglepath.dotted") {
-                        RoadmapRow(title: "Deploy sstikr.com preview", systemImage: "globe")
-                        RoadmapRow(title: "Friends and mutuals", systemImage: "person.2.fill")
-                        RoadmapRow(title: "Duplicate comparison", systemImage: "arrow.left.arrow.right")
-                        RoadmapRow(title: "Exchange requests", systemImage: "shippingbox.fill")
                     }
                 }
                 .padding(.horizontal, 16)
@@ -467,19 +445,6 @@ private struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .stickerCard()
-    }
-}
-
-@MainActor
-private struct RoadmapRow: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(Color.stickerInk)
-            .labelStyle(.titleAndIcon)
     }
 }
 
