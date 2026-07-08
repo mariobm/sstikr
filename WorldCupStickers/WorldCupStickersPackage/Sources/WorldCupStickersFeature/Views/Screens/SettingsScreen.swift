@@ -12,6 +12,8 @@ struct SettingsScreen: View {
     @State private var isAccountSheetPresented = false
     @State private var isExportSheetPresented = false
     @State private var isImportSheetPresented = false
+    @State private var isWantedSheetPresented = false
+    @State private var isMissingExportSheetPresented = false
     @State private var didCopyProfileLink = false
     @State private var visibilitySaveTask: Task<Void, Never>?
     @State private var isDeleteAccountConfirmPresented = false
@@ -86,6 +88,36 @@ struct SettingsScreen: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+
+                    SettingsCard(title: "Look for", systemImage: "checklist") {
+                        Toggle("Filter scanner to wanted stickers", isOn: $syncStatus.isWantedFilterEnabled)
+
+                        if syncStatus.isWantedFilterEnabled {
+                            HStack {
+                                Text("\(syncStatus.wantedStickerIDs.count) stickers")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Edit list") {
+                                    isWantedSheetPresented = true
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.stickerTeal)
+                            }
+                        }
+
+                        Button {
+                            isMissingExportSheetPresented = true
+                        } label: {
+                            Label("Export missing stickers", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.stickerTeal)
+
+                        Text("Paste a list of stickers you're looking for. The scanner will only react to stickers on this list. Export missing stickers to share or paste into the list.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     SettingsCard(title: "Display", systemImage: "eye") {
@@ -228,6 +260,21 @@ struct SettingsScreen: View {
                 ImportSheet { text in
                     importCollection(text)
                 }
+            }
+            .sheet(isPresented: $isWantedSheetPresented) {
+                WantedStickersSheet(
+                    existingIDs: syncStatus.wantedStickerIDs
+                ) { newIDs in
+                    syncStatus.wantedStickerIDs = newIDs
+                }
+            }
+            .sheet(isPresented: $isMissingExportSheetPresented) {
+                ExportSheet(
+                    exportText: CollectionTransfer.exportMissing(
+                        ownedStickers: ownedStickers,
+                        catalog: catalog
+                    )
+                )
             }
             .task {
                 applyProfileVisibility()
@@ -551,6 +598,75 @@ private struct ImportSheet: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will delete all your current stickers and import the ones from the text. This cannot be undone.")
+            }
+        }
+    }
+}
+
+@MainActor
+private struct WantedStickersSheet: View {
+    let existingIDs: Set<String>
+    let onSave: (Set<String>) -> Void
+
+    @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var parsedCount = 0
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Paste your wanted stickers in the format `TEAM: number, number` (one team per line).")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextEditor(text: $text)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 240)
+                        .padding(8)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: text) { _, newValue in
+                            let ids = WantedStickerParser.parse(newValue, catalog: catalog)
+                            parsedCount = ids.count
+                        }
+
+                    if parsedCount > 0 {
+                        Label("\(parsedCount) stickers found in catalog", systemImage: "checkmark.circle.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.stickerTeal)
+                    }
+
+                    Button {
+                        let ids = WantedStickerParser.parse(text, catalog: catalog)
+                        onSave(ids)
+                        dismiss()
+                    } label: {
+                        Label("Save wanted list", systemImage: "checkmark")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.stickerTeal)
+                    .disabled(parsedCount == 0)
+
+                    if !existingIDs.isEmpty {
+                        Button("Clear list", role: .destructive) {
+                            onSave([])
+                            dismiss()
+                        }
+                        .font(.subheadline)
+                    }
+                }
+                .padding(20)
+            }
+            .background(StickerBackdrop())
+            .navigationTitle("Look For")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
             }
         }
     }

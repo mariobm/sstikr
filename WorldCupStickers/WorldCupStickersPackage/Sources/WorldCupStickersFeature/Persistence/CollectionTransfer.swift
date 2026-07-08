@@ -30,6 +30,27 @@ public enum CollectionTransfer {
         return "\(header)|\(profileID)|\(ranges)|\(duplicates)"
     }
 
+    public static func exportMissing(
+        ownedStickers: [OwnedSticker],
+        catalog: StickerCatalogStore
+    ) -> String {
+        let ownedIDs = Set(ownedStickers.filter { $0.quantity > 0 }.map(\.stickerID))
+
+        let missingByTeam = Dictionary(grouping: catalog.stickers.filter { !ownedIDs.contains($0.id) }) {
+            $0.teamCode
+        }
+
+        let lines: [(teamCode: String, numbers: String, sortOrder: Int)] = missingByTeam
+            .map { teamCode, stickers in
+                let numbers = stickers.map(\.number).sorted().map(String.init).joined(separator: ", ")
+                let sortOrder = catalog.team(for: teamCode)?.sortOrder ?? Int.max
+                return (teamCode: teamCode, numbers: numbers, sortOrder: sortOrder)
+            }
+            .sorted { $0.sortOrder < $1.sortOrder }
+
+        return lines.map { "\($0.teamCode): \($0.numbers)" }.joined(separator: "\n")
+    }
+
     public static func parse(_ text: String) -> CollectionTransferData? {
         let parts = text.trimmingCharacters(in: .whitespacesAndNewlines)
             .split(separator: "|", omittingEmptySubsequences: false)

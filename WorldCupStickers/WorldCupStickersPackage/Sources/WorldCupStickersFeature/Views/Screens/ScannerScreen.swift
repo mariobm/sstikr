@@ -46,6 +46,13 @@ struct ScannerScreen: View {
                     return
                 }
 
+                if syncStatus.isWantedFilterEnabled && !syncStatus.wantedStickerIDs.contains(definition.id) {
+                    scanner.discardStableResult(
+                        message: "Not looking for \(definition.displayCode)."
+                    )
+                    return
+                }
+
                 if syncStatus.fastMode && recentScans.contains(definition.id) {
                     scanner.discardStableResult(
                         message: "Already scanned \(definition.displayCode). Looking for the next sticker."
@@ -71,10 +78,22 @@ struct ScannerScreen: View {
             .sheet(item: $pendingScan, onDismiss: {
                 scanner.resumeDetections()
             }) { result in
-                ScanConfirmationSheet(result: result) { teamCode, number, confidence in
-                    addSticker(teamCode: teamCode, number: number, confidence: confidence)
-                }
+                ScanConfirmationSheet(
+                    result: result,
+                    initialOwnedQuantity: ownedQuantity(for: result),
+                    onAdd: { teamCode, number, confidence in
+                        addSticker(teamCode: teamCode, number: number, confidence: confidence)
+                    },
+                    onRemove: { definition in
+                        removeStickerDirectly(definition)
+                    },
+                    onRemoveFromWanted: { stickerID in
+                        syncStatus.wantedStickerIDs.remove(stickerID)
+                    }
+                )
                 .presentationDetents([.medium])
+                .presentationBackground(.ultraThinMaterial)
+                .presentationDragIndicator(.visible)
             }
         }
     }
@@ -136,6 +155,10 @@ struct ScannerScreen: View {
                         Text("\(candidate.displayCode) - \(candidate.confidence.formatted(.percent.precision(.fractionLength(0)))) confidence")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                    } else if syncStatus.isWantedFilterEnabled {
+                        Label("Looking for \(syncStatus.wantedStickerIDs.count) stickers", systemImage: "checklist")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.stickerTeal)
                     } else {
                         Text("Align the sticker inside the guide.")
                             .font(.subheadline)
@@ -166,6 +189,13 @@ struct ScannerScreen: View {
 
     private var ownedByID: [String: OwnedSticker] {
         Dictionary(uniqueKeysWithValues: ownedStickers.map { ($0.stickerID, $0) })
+    }
+
+    private func ownedQuantity(for result: StickerScanResult) -> Int {
+        guard let definition = catalog.sticker(teamCode: result.teamCode, number: result.number) else {
+            return 0
+        }
+        return ownedByID[definition.id]?.quantity ?? 0
     }
 
     private var scanGuide: some View {
@@ -247,6 +277,24 @@ struct ScannerScreen: View {
         }
     }
 
+    private func removeStickerDirectly(_ definition: StickerDefinition) {
+        do {
+            _ = try CollectionWriter.removeSticker(
+                teamCode: definition.teamCode,
+                number: definition.number,
+                catalog: catalog,
+                context: modelContext
+            )
+            let label = definition.name.isEmpty ? definition.displayCode : definition.name
+            withAnimation {
+                addMessage = "Removed \(label)"
+            }
+            scanner.discardStableResult(message: "Ready for the next scan.")
+        } catch {
+            addMessage = "Could not remove sticker."
+        }
+    }
+
     private func recordRecentScan(_ stickerID: String) {
         recentScans.append(stickerID)
         let maxSize = max(syncStatus.recentScanBufferSize, 1)
@@ -259,16 +307,29 @@ struct ScannerScreen: View {
 @MainActor
 private struct ScanConfirmationSheet: View {
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(SyncStatusStore.self) private var syncStatus
     @Query private var ownedStickers: [OwnedSticker]
     let result: StickerScanResult
+    let initialOwnedQuantity: Int
     let onAdd: (String, Int, Double?) -> Void
+    let onRemove: (StickerDefinition) -> Void
+    let onRemoveFromWanted: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var teamCode: String
     @State private var numberText: String
 
-    init(result: StickerScanResult, onAdd: @escaping (String, Int, Double?) -> Void) {
+    init(
+        result: StickerScanResult,
+        initialOwnedQuantity: Int,
+        onAdd: @escaping (String, Int, Double?) -> Void,
+        onRemove: @escaping (StickerDefinition) -> Void,
+        onRemoveFromWanted: @escaping (String) -> Void
+    ) {
         self.result = result
+        self.initialOwnedQuantity = initialOwnedQuantity
         self.onAdd = onAdd
+        self.onRemove = onRemove
+        self.onRemoveFromWanted = onRemoveFromWanted
         _teamCode = State(initialValue: result.teamCode)
         _numberText = State(initialValue: "\(result.number)")
     }
@@ -287,9 +348,26 @@ private struct ScanConfirmationSheet: View {
         return catalog.sticker(teamCode: teamCode, number: number)
     }
 
+    private var activeDefinition: StickerDefinition? {
+        editedDefinition ?? detectedDefinition
+    }
+
+    private var activeTeam: TeamDefinition? {
+        guard let activeDefinition else { return nil }
+        return catalog.team(for: activeDefinition.teamCode)
+    }
+
     private var duplicateQuantity: Int {
-        guard let definition = editedDefinition ?? detectedDefinition else { return 0 }
-        return ownedByID[definition.id]?.quantity ?? 0
+        guard let definition = activeDefinition else { return 0 }
+        let liveQuantity = ownedByID[definition.id]?.quantity ?? 0
+        if definition.id == detectedDefinition?.id {
+            return max(initialOwnedQuantity, liveQuantity)
+        }
+        return liveQuantity
+    }
+
+    private var duplicateStatus: DuplicateStatus {
+        DuplicateStatus(quantity: duplicateQuantity)
     }
 
     private var ownedByID: [String: OwnedSticker] {
@@ -297,87 +375,99 @@ private struct ScanConfirmationSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    if let definition = detectedDefinition,
-                       let team = detectedTeam {
-                        detectedHeader(definition: definition, team: team)
+        ZStack {
+            Color.clear
 
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    topActionBar
+
+                    if let definition = activeDefinition,
+                       let team = activeTeam {
+                        detectedHeader(definition: definition, team: team)
+                    }
+
+                    if let definition = activeDefinition {
                         stickerImage(definition)
                     }
 
-                    HStack {
-                        Text("Match")
-                        Spacer()
-                        Text("100% catalog match")
-                            .foregroundStyle(Color.stickerTeal)
-                    }
-                }
+                    correctionPanel
 
-                Section {
-                    TextField("Country code", text: $teamCode)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                    TextField("Number", text: $numberText)
-                        .keyboardType(.numberPad)
-
-                    duplicateBadge
-                }
-
-                if let definition = editedDefinition,
-                   let team = catalog.team(for: definition.teamCode) {
-                    Section("Match") {
+                    if let definition = activeDefinition,
+                       let team = activeTeam {
                         Label("\(team.name) - \(definition.displayCode)", systemImage: "checkmark.seal.fill")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.stickerTeal)
-                    }
-                } else if editedDefinition == nil && !teamCode.isEmpty {
-                    Section("Match") {
+                    } else {
                         Label("No catalog match", systemImage: "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.stickerOrange)
                     }
+
+                    removeArea
                 }
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Retry") {
-                        dismiss()
-                    }
-                    .accessibilityIdentifier("retryScanButton")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        guard let number = Int(numberText) else { return }
-                        onAdd(teamCode.uppercased(), number, result.confidence)
-                        dismiss()
-                    }
-                    .disabled(editedDefinition == nil)
-                    .accessibilityIdentifier("addScannedStickerButton")
-                }
+                .padding(18)
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
             }
         }
     }
 
-    private func detectedHeader(definition: StickerDefinition, team: TeamDefinition) -> some View {
-        HStack(spacing: 12) {
-            Text(team.flag)
-                .font(.system(size: 24))
-                .frame(width: 42, height: 42)
-                .background(Color.cardSurface.opacity(0.92), in: Circle())
+    private var topActionBar: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.glass)
+            .controlSize(.regular)
+            .accessibilityIdentifier("retryScanButton")
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(definition.displayCode)
-                    .font(.title3.weight(.bold))
-                    .monospacedDigit()
-                Text(team.name)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            Spacer()
+
+            Button {
+                guard let number = Int(numberText) else { return }
+                onAdd(teamCode.uppercased(), number, result.confidence)
+                dismiss()
+            } label: {
+                Label("Add", systemImage: "plus.circle.fill")
+            }
+            .buttonStyle(.glassProminent)
+            .tint(.stickerTeal)
+            .controlSize(.regular)
+            .disabled(editedDefinition == nil)
+            .accessibilityIdentifier("addScannedStickerButton")
+        }
+    }
+
+    private func detectedHeader(definition: StickerDefinition, team: TeamDefinition) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            HStack(spacing: 12) {
+                Text(team.flag)
+                    .font(.system(size: 25))
+                    .frame(width: 46, height: 46)
+                    .background(.regularMaterial, in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(definition.displayCode)
+                        .font(.title2.weight(.black))
+                        .monospacedDigit()
+                    Text(team.name)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
+
+            duplicateStatusPill
         }
+        .padding(16)
+        .stickerGlass(cornerRadius: 22)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(team.name), \(definition.displayCode)")
+        .accessibilityLabel("\(team.name), \(definition.displayCode), \(duplicateStatus.text)")
     }
 
     @ViewBuilder
@@ -388,8 +478,9 @@ private struct ScanConfirmationSheet: View {
                 image
                     .resizable()
                     .scaledToFit()
-                    .frame(maxHeight: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 210)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             case .failure:
                 EmptyView()
             case .empty:
@@ -399,22 +490,105 @@ private struct ScanConfirmationSheet: View {
                 EmptyView()
             }
         }
-        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .padding(10)
+        .background(Color.cardSurface.opacity(0.64), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
-    private var duplicateBadge: some View {
-        if editedDefinition != nil {
-            if duplicateQuantity > 0 {
-                Label("Duplicate — you have \(duplicateQuantity)", systemImage: "square.stack.3d.up.fill")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.stickerOrange)
-            } else {
-                Label("New sticker", systemImage: "sparkles")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color.stickerTeal)
+    private var correctionPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Code")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Country code", text: $teamCode)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .font(.title3.weight(.bold).monospaced())
+                        .padding(.horizontal, 12)
+                        .frame(height: 48)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Number")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("Number", text: $numberText)
+                        .keyboardType(.numberPad)
+                        .font(.title3.weight(.bold).monospacedDigit())
+                        .padding(.horizontal, 12)
+                        .frame(height: 48)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
             }
+
+            Text("Catalog match is confirmed before adding.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
+        .padding(16)
+        .stickerGlass(cornerRadius: 22)
+    }
+
+    @ViewBuilder
+    private var removeArea: some View {
+        if let definition = activeDefinition {
+            VStack(alignment: .leading, spacing: 8) {
+                Divider()
+                    .opacity(0.45)
+
+                Button(role: .destructive) {
+                    onRemove(definition)
+                    if syncStatus.isWantedFilterEnabled && syncStatus.wantedStickerIDs.contains(definition.id) {
+                        onRemoveFromWanted(definition.id)
+                    }
+                    dismiss()
+                } label: {
+                    Label("Remove from collection", systemImage: "minus.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .tint(.stickerOrange)
+                .accessibilityIdentifier("removeScannedStickerButton")
+
+                Text(syncStatus.isWantedFilterEnabled && syncStatus.wantedStickerIDs.contains(definition.id)
+                     ? "Also removes this sticker from the wanted list."
+                     : "Use this when the physical duplicate leaves your pile.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private var duplicateStatusPill: some View {
+        Label(duplicateStatus.text, systemImage: duplicateStatus.symbol)
+            .font(.caption.weight(.bold))
+            .lineLimit(1)
+            .foregroundStyle(duplicateStatus.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(duplicateStatus.color.opacity(0.14), in: Capsule())
+    }
+}
+
+private struct DuplicateStatus {
+    let quantity: Int
+
+    var text: String {
+        quantity > 0 ? "Duplicate x\(quantity)" : "New sticker"
+    }
+
+    var symbol: String {
+        quantity > 0 ? "square.stack.3d.up.fill" : "sparkles"
+    }
+
+    var color: Color {
+        quantity > 0 ? .stickerOrange : .stickerTeal
     }
 }

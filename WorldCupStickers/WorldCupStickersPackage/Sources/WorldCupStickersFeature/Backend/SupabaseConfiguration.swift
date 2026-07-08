@@ -69,6 +69,8 @@ public final class SyncStatusStore {
     public var fastMode: Bool = false
     public var recentScanBufferSize: Int = 5
     public var cleanMode: Bool = true
+    public var wantedStickerIDs: Set<String> = []
+    public var isWantedFilterEnabled: Bool = false
 
     public init(configuration: SupabaseConfiguration? = .fromEnvironment()) {
         if let configuration {
