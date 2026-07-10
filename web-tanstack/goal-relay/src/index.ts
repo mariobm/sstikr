@@ -175,7 +175,11 @@ async function proxyScoreRequest(
 
 function scoreProviderRequest(request: Request, env: Env): ScoreProviderRequest | null {
   const requestURL = new URL(request.url);
-  const suffix = requestURL.pathname.slice("/v1/scores/".length);
+  const rawSuffix = requestURL.pathname.slice("/v1/scores/".length);
+  // URL.appendingPathComponent in the iOS client produces a canonical path
+  // without a trailing slash. Accept that form as well as the provider's
+  // slash-terminated endpoint form.
+  const suffix = rawSuffix.endsWith("/") ? rawSuffix : `${rawSuffix}/`;
   const baseURL = `${env.SPORTS_API_BASE_URL.replace(/\/+$/u, "")}/`;
   const output = new URL(suffix, baseURL);
 
