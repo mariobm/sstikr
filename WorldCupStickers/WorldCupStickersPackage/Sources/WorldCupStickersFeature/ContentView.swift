@@ -6,11 +6,13 @@ public struct ContentView: View {
     @State private var catalogStore = StickerCatalogStore()
     @State private var syncStatus: SyncStatusStore
     @State private var accountStore: SupabaseAccountStore
+    @State private var scoresStore: WorldCupScoresStore
 
     public init() {
         let configuration = SupabaseConfiguration.fromEnvironment()
         _syncStatus = State(initialValue: SyncStatusStore(configuration: configuration))
         _accountStore = State(initialValue: SupabaseAccountStore(configuration: configuration))
+        _scoresStore = State(initialValue: WorldCupScoresStore())
     }
 
     public var body: some View {
@@ -18,6 +20,7 @@ public struct ContentView: View {
             .environment(catalogStore)
             .environment(syncStatus)
             .environment(accountStore)
+            .environment(scoresStore)
             .task {
                 await catalogStore.load()
                 await accountStore.refreshSession()
@@ -32,12 +35,17 @@ public struct ContentView: View {
 
 @MainActor
 private struct RootTabView: View {
+    @Environment(WorldCupScoresStore.self) private var scoresStore
     @State private var selectedTab: AppTab = .collection
 
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Collection", systemImage: "square.grid.3x3.fill", value: AppTab.collection) {
                 CollectionScreen()
+            }
+
+            Tab("Scores", systemImage: "soccerball", value: AppTab.scores) {
+                ScoresScreen()
             }
 
             Tab("Scan", systemImage: "camera.viewfinder", value: AppTab.scan) {
@@ -54,11 +62,28 @@ private struct RootTabView: View {
         }
         .tint(.stickerTeal)
         .tabBarMinimizeBehavior(.onScrollDown)
+        .task {
+            guard selectedTab == .scores else { return }
+            await scoresStore.start()
+        }
+        .onChange(of: selectedTab) { _, selectedTab in
+            if selectedTab == .scores {
+                Task {
+                    await scoresStore.start()
+                }
+            } else {
+                scoresStore.stop()
+            }
+        }
+        .onDisappear {
+            scoresStore.stop()
+        }
     }
 }
 
 private enum AppTab: Hashable {
     case collection
+    case scores
     case scan
     case settings
     case search

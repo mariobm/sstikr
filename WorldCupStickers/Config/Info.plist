@@ -19,6 +19,12 @@
 	<string>sstikr://auth</string>
 	<key>SUPABASE_URL</key>
 	<string>https://xuiimwcktmdjgupczfjb.supabase.co</string>
+	<key>SPORTS_API_BASE_URL</key>
+	<string>$(SPORTS_API_BASE_URL)</string>
+	<key>SPORTS_LIVE_WEBSOCKET_URL</key>
+	<string>$(SPORTS_LIVE_WEBSOCKET_URL)</string>
+	<key>SPORTS_API_TOKEN</key>
+	<string>$(SPORTS_API_TOKEN)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>
