@@ -21,6 +21,12 @@ the user signs in, the first sync merges by max quantity so local duplicates are
 not lost. Later syncs let the current local quantities win and write mutation
 audit rows to `collection_mutations`.
 
+## Goal alerts
+
+The approved direction for World Cup goal notifications is Supabase orchestration
+with direct APNs delivery. See [GOAL_NOTIFICATIONS.md](GOAL_NOTIFICATIONS.md) for
+the schema, deduplication, secrets, and rollout plan.
+
 ## Sticker Images
 
 `public.sticker_catalog.image_path` stores the R2 object key, for example

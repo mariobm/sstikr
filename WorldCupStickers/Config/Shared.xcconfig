@@ -35,8 +35,16 @@ SUPABASE_URL =
 SUPABASE_PUBLISHABLE_KEY =
 SUPABASE_REDIRECT_URL =
 
+// Sports score feed configuration. Keep the token in SportsConfig.xcconfig,
+// which is intentionally ignored by git.
+// XCConfig treats // as a comment; $() expands to an empty string and preserves the URL slash.
+SPORTS_API_BASE_URL = https:/$()/sports.bzzoiro.com
+SPORTS_LIVE_WEBSOCKET_URL = wss:/$()/sports.bzzoiro.com/ws/live/
+SPORTS_API_TOKEN =
+
 // Local.xcconfig is git-ignored and can provide the public Supabase client values for device builds.
 #include? "Local.xcconfig"
+#include? "SportsConfig.xcconfig"
 
 // ==========================================
 // Entitlements

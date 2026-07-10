@@ -48,6 +48,11 @@ public final class StickerCatalogStore {
         teamsByCode[code.uppercased()]
     }
 
+    public func team(named name: String) -> TeamDefinition? {
+        let lookupName = Self.normalizedTeamName(name)
+        return teams.first { Self.normalizedTeamName($0.name) == lookupName }
+    }
+
     public func sticker(id: String) -> StickerDefinition? {
         stickersByID[id]
     }
@@ -103,6 +108,31 @@ public final class StickerCatalogStore {
 
     private static func lookupKey(teamCode: String, number: Int) -> String {
         "\(teamCode.uppercased())-\(number)"
+    }
+
+    private static func normalizedTeamName(_ name: String) -> String {
+        let normalized = name
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .unicodeScalars
+            .filter { CharacterSet.alphanumerics.contains($0) }
+            .map(String.init)
+            .joined()
+            .lowercased()
+
+        let aliases = [
+            "unitedstates": "usa",
+            "southkorea": "korearepublic",
+            "koreasouth": "korearepublic",
+            "iran": "iriran",
+            "capeverde": "caboverde",
+            "turkey": "turkiye",
+            "ivorycoast": "cotedivoire",
+            "drcongo": "congodr",
+            "democraticrepublicofthecongo": "congodr",
+            "bosniaandherzegovina": "bosniaherzegovina"
+        ]
+
+        return aliases[normalized] ?? normalized
     }
 
     private func catalogQuantitiesByStickerID(for ownedStickers: [OwnedSticker]) -> [String: Int] {

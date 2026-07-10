@@ -22,4 +22,5 @@ WorldCupStickers/output/
 WorldCupStickers/web/
 WorldCupStickers/tmp/
 WorldCupStickers/Config/Local.xcconfig
+WorldCupStickers/Config/SportsConfig.xcconfig
 WorldCupStickers/WorldCupStickersPackage/Sources/WorldCupStickersFeature/Resources/SupabaseConfig.json
