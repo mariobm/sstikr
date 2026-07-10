@@ -11,12 +11,13 @@
 .agents/
 WorldCupStickers/.agents/
 
-web-tanstack/node_modules/
+**/node_modules/
 web-tanstack/dist/
 web-tanstack/.tanstack/tmp/
 web-tanstack/.wrangler/
-web-tanstack/.dev.vars
-web-tanstack/.env.local
+**/.dev.vars
+**/.env.local
+web-tanstack/goal-relay/worker-configuration.d.ts
 
 WorldCupStickers/output/
 WorldCupStickers/web/

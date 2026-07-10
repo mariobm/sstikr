@@ -50,6 +50,11 @@ public final class SupabaseAccountStore {
         return account
     }
 
+    public func currentAccessToken() async -> String? {
+        guard let client else { return nil }
+        return try? await client.auth.session.accessToken
+    }
+
     func refreshSession() async {
         guard let client else {
             state = .notConfigured

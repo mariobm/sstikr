@@ -1,52 +1,61 @@
 import Foundation
 
 public struct WorldCupScoresConfiguration: Equatable, Sendable {
-    public let apiBaseURL: URL
-    public let liveWebSocketURL: URL
-    public let token: String
+    public let relayURL: URL
 
-    public init?(apiBaseURL: String, liveWebSocketURL: String, token: String) {
-        let trimmedBaseURL = apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedWebSocketURL = liveWebSocketURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+    public init?(relayURL: String) {
+        let trimmedRelayURL = relayURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !trimmedToken.isEmpty,
-              !trimmedToken.hasPrefix("$("),
-              let apiBaseURL = URL(string: trimmedBaseURL),
-              let liveWebSocketURL = URL(string: trimmedWebSocketURL) else {
+        guard !trimmedRelayURL.isEmpty,
+              !trimmedRelayURL.hasPrefix("$("),
+              let relayURL = URL(string: trimmedRelayURL),
+              relayURL.scheme == "https",
+              relayURL.host != nil else {
             return nil
         }
 
-        self.apiBaseURL = apiBaseURL
-        self.liveWebSocketURL = liveWebSocketURL
-        self.token = trimmedToken
+        self.relayURL = relayURL
     }
 
     public static func fromEnvironment() -> WorldCupScoresConfiguration? {
         let environment = ProcessInfo.processInfo.environment
         let bundle = Bundle.main
 
-        let apiBaseURL = environment["SPORTS_API_BASE_URL"] ?? bundle.sportsInfoString(forKey: "SPORTS_API_BASE_URL")
-        let liveWebSocketURL = environment["SPORTS_LIVE_WEBSOCKET_URL"] ?? bundle.sportsInfoString(forKey: "SPORTS_LIVE_WEBSOCKET_URL")
-        let token = environment["SPORTS_API_TOKEN"] ?? bundle.sportsInfoString(forKey: "SPORTS_API_TOKEN")
+        let relayURL = environment["GOAL_RELAY_URL"] ?? bundle.sportsInfoString(forKey: "GOAL_RELAY_URL")
 
-        guard let apiBaseURL, let liveWebSocketURL, let token else { return nil }
-        return WorldCupScoresConfiguration(
-            apiBaseURL: apiBaseURL,
-            liveWebSocketURL: liveWebSocketURL,
-            token: token
-        )
+        guard let relayURL else { return nil }
+        return WorldCupScoresConfiguration(relayURL: relayURL)
     }
 
-    func authenticatedWebSocketURL() -> URL? {
-        guard var components = URLComponents(url: liveWebSocketURL, resolvingAgainstBaseURL: false) else {
+    func scoreURL(path: String, queryItems: [URLQueryItem]) -> URL? {
+        let normalizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !normalizedPath.isEmpty,
+              var components = URLComponents(
+                url: relayURL
+                    .appendingPathComponent("v1")
+                    .appendingPathComponent("scores")
+                    .appendingPathComponent(normalizedPath),
+                resolvingAgainstBaseURL: false
+              ) else {
             return nil
         }
 
-        var queryItems = components.queryItems ?? []
-        queryItems.removeAll { $0.name == "token" }
-        queryItems.append(URLQueryItem(name: "token", value: token))
         components.queryItems = queryItems
+        return components.url
+    }
+
+    func liveWebSocketURL() -> URL? {
+        guard var components = URLComponents(
+            url: relayURL
+                .appendingPathComponent("v1")
+                .appendingPathComponent("live"),
+            resolvingAgainstBaseURL: false
+        ) else {
+            return nil
+        }
+
+        guard components.scheme == "https" else { return nil }
+        components.scheme = "wss"
         return components.url
     }
 }

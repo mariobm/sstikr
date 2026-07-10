@@ -311,19 +311,12 @@ actor WorldCupScoresClient {
     }
 
     private func fetchData(path: String, queryItems: [URLQueryItem] = []) async throws -> Data {
-        let endpoint = configuration.apiBaseURL.appendingPathComponent(path)
-        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
-            throw WorldCupScoresClientError.invalidURL
-        }
-        components.queryItems = queryItems.isEmpty ? nil : queryItems
-
-        guard let url = components.url else {
+        guard let url = configuration.scoreURL(path: path, queryItems: queryItems) else {
             throw WorldCupScoresClientError.invalidURL
         }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
-        request.setValue("Token \(configuration.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await URLSession.shared.data(for: request)

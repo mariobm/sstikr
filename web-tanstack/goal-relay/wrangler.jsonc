@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sstikr-goal-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORLD_CUP_FEED",
+        "class_name": "WorldCupFeed"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorldCupFeed"]
+    }
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "vars": {
+    "SPORTS_API_BASE_URL": "https://sports.bzzoiro.com",
+    "SPORTS_LIVE_WEBSOCKET_URL": "wss://sports.bzzoiro.com/ws/live/",
+    "WORLD_CUP_LEAGUE_ID": "27",
+    "WORLD_CUP_SEASON_ID": "188"
+  },
+  "secrets": {
+    "required": [
+      "SPORTS_API_TOKEN",
+      "SUPABASE_URL",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "APNS_KEY_P8",
+      "APNS_KEY_ID",
+      "APNS_TEAM_ID",
+      "APNS_TOPIC"
+    ]
+  }
+}

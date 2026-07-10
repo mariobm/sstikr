@@ -266,6 +266,30 @@ public final class WorldCupScoresStore {
         }
     }
 
+    /// A notification can arrive while Scores has not yet loaded its normal live/upcoming
+    /// page. Refresh first, then check the most recent completed page as a recovery path.
+    public func ensureMatchLoaded(for eventID: Int) async {
+        guard client != nil else {
+            loadState = .unconfigured
+            return
+        }
+
+        if !isRunning {
+            await start()
+        }
+        guard match(withID: eventID) == nil else { return }
+
+        await refresh()
+        guard let client, match(withID: eventID) == nil else { return }
+
+        do {
+            let page = try await client.fetchCompletedMatches(limit: completedPageSize, offset: 0)
+            matches = sort(merge(page.matches, with: matches))
+        } catch {
+            refreshError = error.localizedDescription
+        }
+    }
+
     private func enrichLiveMatches(using client: WorldCupScoresClient) async {
         let eventIDs = liveMatches.map(\.id)
         guard !eventIDs.isEmpty else { return }
@@ -360,7 +384,7 @@ public final class WorldCupScoresStore {
         closeLiveSocket()
         subscriptionIDs = desiredIDs
         guard !desiredIDs.isEmpty,
-              let url = configuration?.authenticatedWebSocketURL() else {
+              let url = configuration?.liveWebSocketURL() else {
             liveConnectionState = .inactive
             return
         }
@@ -490,7 +514,7 @@ public final class WorldCupScoresStore {
             guard let self,
                   self.isRunning,
                   !Task.isCancelled,
-                  let url = self.configuration?.authenticatedWebSocketURL() else {
+                  let url = self.configuration?.liveWebSocketURL() else {
                 return
             }
 

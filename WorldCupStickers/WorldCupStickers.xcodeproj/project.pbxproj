@@ -35,6 +35,7 @@
 				Local.xcconfig,
 				Release.xcconfig,
 				Shared.xcconfig,
+				SportsConfig.xcconfig,
 				Tests.xcconfig,
 			);
 			target = 8B41F6442DEDD0D5001A66F9 /* WorldCupStickers */;

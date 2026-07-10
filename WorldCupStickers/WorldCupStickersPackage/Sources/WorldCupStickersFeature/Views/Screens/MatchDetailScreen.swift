@@ -34,6 +34,7 @@ struct MatchDetailScreen: View {
         .navigationTitle("Match")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: matchID) {
+            await scoresStore.ensureMatchLoaded(for: matchID)
             await scoresStore.loadMatchDetails(for: matchID)
         }
     }

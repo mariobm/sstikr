@@ -4,5 +4,7 @@
 
 #include "Shared.xcconfig"
 
+APS_ENVIRONMENT = development
+
 // No additional debug-specific overrides needed
 // All debug settings use Xcode project defaults
