@@ -1,15 +1,13 @@
 # Supabase Backend
 
-This folder contains the readable SQL scaffold for the sync and trading phase.
-The executable Supabase CLI project now lives at `../../supabase`.
+This folder contains readable notes for the sync and community-trading backend.
+The executable Supabase CLI project lives at `../../supabase`; its migrations
+are the source of truth and are deployed to the linked Supabase project.
 
-The backend is scaffolded here, but it is not live until a Supabase project is
-created and these SQL files are applied.
-
-## Apply Locally
+## Local Development And Migrations
 
 1. Create or link a Supabase project from `WorldCupStickers/`.
-2. Run `supabase db push` to apply `supabase/migrations`.
+2. Run `supabase db push --linked` to apply pending migrations to the linked project.
 3. Run `supabase db reset --local` for local development; it applies `supabase/seed.sql` with the same 994 definitions used by the iOS app.
 4. Set these values for the iOS app and web app:
    - `SUPABASE_URL`
@@ -20,6 +18,15 @@ The app is local-first. Offline scans create local mutation records first; once
 the user signs in, the first sync merges by max quantity so local duplicates are
 not lost. Later syncs let the current local quantities win and write mutation
 audit rows to `collection_mutations`.
+
+## Community Trading
+
+The community migrations add an opt-in username discovery flag, canonical
+friendships, blocks, normalized exchange line items, and reciprocal handoff
+confirmation. Direct writes to friend/trade tables are revoked from the client;
+the iOS app uses authenticated database functions that validate relationship,
+visibility, and duplicate availability before changing state. Trades document a
+proposed in-person exchange only and do not automatically modify collections.
 
 ## Goal alerts
 

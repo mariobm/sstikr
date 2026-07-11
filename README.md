@@ -1,8 +1,8 @@
 # Sstikr - World Cup Stickers
 
-Sstikr is a native iOS app for tracking a FIFA World Cup 2026 sticker album. It is built around fast collection management, camera scanning, duplicate tracking, wanted-list scanning for trades, optional cloud sync, and shareable duplicate previews.
+Sstikr is a native iOS app for tracking a FIFA World Cup 2026 sticker album. It is built around fast collection management, camera scanning, duplicate tracking, wanted-list scanning for trades, optional cloud sync, shareable duplicate previews, and collector-to-collector trading.
 
-The app can work fully offline. Signing in is optional and is only needed for Supabase sync, profile sharing, and future social/trading features.
+The app can work fully offline. Signing in is optional and is only needed for Supabase sync, profile sharing, and community trading.
 
 This is an unofficial collection tracker and is not affiliated with FIFA, Panini, or the FIFA World Cup.
 
@@ -22,6 +22,8 @@ This is an unofficial collection tracker and is not affiliated with FIFA, Panini
 - Optional Supabase account sync with passkey support.
 - Profile sharing through `sstikr.com/u/<handle>`.
 - Public web preview for allowed duplicate data.
+- Opt-in username discovery, friend requests, and block controls.
+- Trade requests that compare duplicate lists and require both collectors to confirm an in-person handoff; the app never transfers collection ownership automatically.
 - Delete account and delete all data controls for App Store privacy requirements.
 
 ## Architecture

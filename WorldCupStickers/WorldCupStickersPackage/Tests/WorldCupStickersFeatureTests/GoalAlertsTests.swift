@@ -34,7 +34,9 @@ struct GoalAlertsTests {
         )
         let liveURL = try #require(configuration.liveWebSocketURL())
 
-        #expect(scoreURL.absoluteString == "https://sstikr-goal-relay.example.workers.dev/v1/scores/api/v2/events/live/?league_id=27")
+        // URL.appendingPathComponent canonicalizes this endpoint without a
+        // trailing slash; the relay accepts this client form explicitly.
+        #expect(scoreURL.absoluteString == "https://sstikr-goal-relay.example.workers.dev/v1/scores/api/v2/events/live?league_id=27")
         #expect(liveURL.absoluteString == "wss://sstikr-goal-relay.example.workers.dev/v1/live")
     }
 }
