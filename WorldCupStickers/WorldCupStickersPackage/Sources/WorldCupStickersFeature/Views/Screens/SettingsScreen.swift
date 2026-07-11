@@ -6,6 +6,7 @@ struct SettingsScreen: View {
     @Environment(SyncStatusStore.self) private var syncStatus
     @Environment(SupabaseAccountStore.self) private var accountStore
     @Environment(StickerCatalogStore.self) private var catalog
+    @Environment(GoalAlertsStore.self) private var goalAlertsStore
     @Environment(\.modelContext) private var modelContext
     @Query private var ownedStickers: [OwnedSticker]
     @State private var didClearImageCache = false
@@ -59,6 +60,10 @@ struct SettingsScreen: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+
+                    SettingsCard(title: "Goal alerts", systemImage: "bell.badge.fill") {
+                        goalAlertsContent
                     }
 
                     SettingsCard(title: "Fast mode", systemImage: "bolt.fill") {
@@ -312,6 +317,88 @@ struct SettingsScreen: View {
             return true
         }
         return false
+    }
+
+    @ViewBuilder
+    private var goalAlertsContent: some View {
+        if goalAlertsStore.authorization == .denied {
+            Label("Goal alerts are unavailable on this iPhone.", systemImage: "bell.slash.fill")
+                .foregroundStyle(.secondary)
+
+            Button("Open iPhone Settings", systemImage: "gearshape") {
+                goalAlertsStore.openSystemSettings()
+            }
+            .buttonStyle(.bordered)
+            .tint(.stickerTeal)
+
+            Text("Allow notifications for Sstikr in iPhone Settings, then return here to register this device.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            Toggle("Goal alerts", isOn: goalAlertsBinding)
+
+            if goalAlertsStore.authorization == .notDetermined {
+                Button("Enable notifications on this iPhone", systemImage: "bell.fill") {
+                    Task {
+                        await goalAlertsStore.requestAuthorization(
+                            accessToken: await accountStore.currentAccessToken()
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.stickerTeal)
+
+                Text("Sstikr asks only after you choose to enable match alerts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            goalAlertRegistrationStatus
+        }
+    }
+
+    private var goalAlertsBinding: Binding<Bool> {
+        Binding(
+            get: { goalAlertsStore.goalAlertsEnabled },
+            set: { isEnabled in
+                Task {
+                    await goalAlertsStore.setGoalAlertsEnabled(
+                        isEnabled,
+                        accessToken: await accountStore.currentAccessToken()
+                    )
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var goalAlertRegistrationStatus: some View {
+        switch goalAlertsStore.registrationState {
+        case .notConfigured:
+            Label("Goal-alert relay is not configured yet.", systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .waitingForPermission:
+            Text("Allow iOS notifications to receive goal alerts.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .waitingForDeviceToken:
+            Text("Registering this iPhone with Apple…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .registering:
+            ProgressView("Registering goal alerts…")
+                .font(.caption)
+                .tint(.stickerTeal)
+        case .registered:
+            Label("This iPhone is ready for World Cup goal alerts.", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(Color.stickerTeal)
+        case let .failed(message):
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder

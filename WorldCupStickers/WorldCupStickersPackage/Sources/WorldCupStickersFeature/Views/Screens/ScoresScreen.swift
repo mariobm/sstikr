@@ -3,9 +3,14 @@ import SwiftUI
 @MainActor
 struct ScoresScreen: View {
     @Environment(WorldCupScoresStore.self) private var scoresStore
+    @Environment(AppRouter.self) private var router
+    @Environment(GoalAlertsStore.self) private var goalAlertsStore
+    @Environment(SupabaseAccountStore.self) private var accountStore
 
     var body: some View {
-        NavigationStack {
+        @Bindable var router = router
+
+        NavigationStack(path: $router.scoresPath) {
             Group {
                 switch scoresStore.loadState {
                 case .unconfigured:
@@ -25,6 +30,23 @@ struct ScoresScreen: View {
                 MatchDetailScreen(matchID: matchID)
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        if goalAlertsStore.authorization == .denied {
+                            goalAlertsStore.openSystemSettings()
+                        } else {
+                            Task {
+                                await goalAlertsStore.requestAuthorization(
+                                    accessToken: await accountStore.currentAccessToken()
+                                )
+                            }
+                        }
+                    } label: {
+                        Image(systemName: goalAlertsStore.authorization == .denied ? "bell.slash" : "bell.badge")
+                    }
+                    .accessibilityLabel("Configure goal alerts")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task {
@@ -308,9 +330,9 @@ struct ScoresScreen: View {
 
     private var configurationNeeded: some View {
         ContentUnavailableView {
-            Label("Scores need a token", systemImage: "key.fill")
+            Label("Scores are being connected", systemImage: "cloud.fill")
         } description: {
-            Text("Add SPORTS_API_TOKEN to the local sports configuration to enable World Cup updates.")
+            Text("The secure World Cup relay has not been configured on this build yet.")
         }
     }
 }

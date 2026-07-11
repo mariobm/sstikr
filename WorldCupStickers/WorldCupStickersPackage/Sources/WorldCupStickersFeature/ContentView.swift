@@ -3,16 +3,24 @@ import SwiftUI
 
 @MainActor
 public struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var catalogStore = StickerCatalogStore()
     @State private var syncStatus: SyncStatusStore
     @State private var accountStore: SupabaseAccountStore
     @State private var scoresStore: WorldCupScoresStore
+    private let goalAlertsStore: GoalAlertsStore
+    private let appRouter: AppRouter
 
-    public init() {
+    public init(
+        goalAlertsStore: GoalAlertsStore = GoalAlertsStore(),
+        appRouter: AppRouter = AppRouter()
+    ) {
         let configuration = SupabaseConfiguration.fromEnvironment()
         _syncStatus = State(initialValue: SyncStatusStore(configuration: configuration))
         _accountStore = State(initialValue: SupabaseAccountStore(configuration: configuration))
         _scoresStore = State(initialValue: WorldCupScoresStore())
+        self.goalAlertsStore = goalAlertsStore
+        self.appRouter = appRouter
     }
 
     public var body: some View {
@@ -21,9 +29,23 @@ public struct ContentView: View {
             .environment(syncStatus)
             .environment(accountStore)
             .environment(scoresStore)
+            .environment(goalAlertsStore)
+            .environment(appRouter)
             .task {
                 await catalogStore.load()
                 await accountStore.refreshSession()
+                await goalAlertsStore.refreshAuthorizationStatus()
+                await goalAlertsStore.syncRegistration(accessToken: await accountStore.currentAccessToken())
+            }
+            .task(id: accountStore.currentUserID) {
+                await goalAlertsStore.syncRegistration(accessToken: await accountStore.currentAccessToken())
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task {
+                    await goalAlertsStore.refreshAuthorizationStatus()
+                    await goalAlertsStore.syncRegistration(accessToken: await accountStore.currentAccessToken())
+                }
             }
             .onOpenURL { url in
                 Task {
@@ -36,10 +58,12 @@ public struct ContentView: View {
 @MainActor
 private struct RootTabView: View {
     @Environment(WorldCupScoresStore.self) private var scoresStore
-    @State private var selectedTab: AppTab = .collection
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        @Bindable var router = router
+
+        TabView(selection: $router.selectedTab) {
             Tab("Collection", systemImage: "square.grid.3x3.fill", value: AppTab.collection) {
                 CollectionScreen()
             }
@@ -63,10 +87,10 @@ private struct RootTabView: View {
         .tint(.stickerTeal)
         .tabBarMinimizeBehavior(.onScrollDown)
         .task {
-            guard selectedTab == .scores else { return }
+            guard router.selectedTab == .scores else { return }
             await scoresStore.start()
         }
-        .onChange(of: selectedTab) { _, selectedTab in
+        .onChange(of: router.selectedTab) { _, selectedTab in
             if selectedTab == .scores {
                 Task {
                     await scoresStore.start()
@@ -79,14 +103,6 @@ private struct RootTabView: View {
             scoresStore.stop()
         }
     }
-}
-
-private enum AppTab: Hashable {
-    case collection
-    case scores
-    case scan
-    case settings
-    case search
 }
 
 @MainActor

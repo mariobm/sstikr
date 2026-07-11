@@ -7,5 +7,7 @@
 		<string>webcredentials:sstikr.com</string>
 		<string>applinks:sstikr.com</string>
 	</array>
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 </dict>
 </plist>
