@@ -31,7 +31,7 @@ Universal Link metadata uses:
 
 ```sh
 APPLE_TEAM_ID=
-IOS_BUNDLE_ID=com.mariobalukcic.worldcupstickers
+IOS_BUNDLE_ID=com.sstikr.worldcupstickers
 APP_STORE_ID=
 ```
 
