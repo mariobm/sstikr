@@ -81,6 +81,14 @@ The core app works offline without an account. Camera frames for sticker scannin
 
 See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) and the live page at [sstikr.com/privacy](https://sstikr.com/privacy).
 
+## License
+
+The original source code in this repository is licensed under the GNU Affero
+General Public License v3.0. See [LICENSE](LICENSE) for the full license text.
+
+Third-party libraries, services, sticker artwork, and other external assets
+remain under their respective licenses.
+
 ## Development
 
 Most iOS development should happen in:
