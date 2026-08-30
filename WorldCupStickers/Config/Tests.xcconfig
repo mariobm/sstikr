@@ -11,7 +11,7 @@ CODE_SIGN_ENTITLEMENTS =
 // ==========================================
 // Test Target Settings (Customizable by scaffold tool)
 // ==========================================
-PRODUCT_BUNDLE_IDENTIFIER = com.mariobalukcic.worldcupstickers
+PRODUCT_BUNDLE_IDENTIFIER = com.sstikr.worldcupstickers.uitests
 TEST_TARGET_NAME = WorldCupStickers
 
 // Fix duplicate module name issue

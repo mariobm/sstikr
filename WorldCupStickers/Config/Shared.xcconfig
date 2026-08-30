@@ -36,7 +36,8 @@ SUPABASE_PUBLISHABLE_KEY =
 SUPABASE_REDIRECT_URL =
 
 // The public Cloudflare relay owns the sports provider token and APNs secrets.
-GOAL_RELAY_URL = https:/$()/sstikr-goal-relay.mario-balukcic1.workers.dev
+// Keep the deployment URL in ignored Local.xcconfig or inject it at build time.
+GOAL_RELAY_URL =
 
 // Local.xcconfig is git-ignored and can provide the public Supabase client values for device builds.
 #include? "Local.xcconfig"

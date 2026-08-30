@@ -164,7 +164,7 @@ struct CommunityScreen: View {
             Text("Find collectors")
                 .font(.title3.weight(.bold))
 
-            Text("Search a username such as @mario. Only collectors who opt in to discovery appear here.")
+            Text("Search a username such as @username. Only collectors who opt in to discovery appear here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 

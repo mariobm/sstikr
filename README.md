@@ -106,6 +106,7 @@ Do not commit service-role keys, Supabase secret keys, database passwords, or Cl
 
 - [iOS project notes](WorldCupStickers/README.md)
 - [Web preview notes](web-tanstack/README.md)
+- [Live scores and goal-alert relay setup](LIVE_SCORE_RELAY_SETUP.md)
 - [Supabase backend notes](WorldCupStickers/backend/supabase/README.md)
 - [R2 image storage notes](WorldCupStickers/backend/r2/README.md)
 - [Privacy policy](PRIVACY_POLICY.md)

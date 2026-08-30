@@ -97,8 +97,11 @@ def render_pdf(pdf_path: Path, render_dir: Path, dpi: int, force: bool) -> None:
         shutil.rmtree(render_dir, ignore_errors=True)
         render_dir.mkdir(parents=True, exist_ok=True)
     prefix = render_dir / "page"
+    pdftoppm = shutil.which("pdftoppm")
+    if pdftoppm is None:
+        raise RuntimeError("pdftoppm is required to render the source PDF; install Poppler and add it to PATH")
     command = [
-        "/Users/mario/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/pdftoppm",
+        pdftoppm,
         "-png",
         "-r",
         str(dpi),
