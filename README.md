@@ -8,7 +8,7 @@ This is an unofficial collection tracker and is not affiliated with FIFA, Panini
 
 ## App showcase
 
-<video src="assets/sstikr-showcase-1.5x.mp4" controls playsinline width="320"></video>
+[![Sstikr app showcase (1.5×)](assets/sstikr-showcase-1.5x.gif)](assets/sstikr-showcase-1.5x.mp4)
 
 [Download the 1.5× app showcase video](assets/sstikr-showcase-1.5x.mp4)
 
