@@ -7,6 +7,7 @@ public struct ContentView: View {
     @State private var catalogStore = StickerCatalogStore()
     @State private var syncStatus: SyncStatusStore
     @State private var accountStore: SupabaseAccountStore
+    @State private var communityStore: CommunityStore
     @State private var scoresStore: WorldCupScoresStore
     private let goalAlertsStore: GoalAlertsStore
     private let appRouter: AppRouter
@@ -18,6 +19,7 @@ public struct ContentView: View {
         let configuration = SupabaseConfiguration.fromEnvironment()
         _syncStatus = State(initialValue: SyncStatusStore(configuration: configuration))
         _accountStore = State(initialValue: SupabaseAccountStore(configuration: configuration))
+        _communityStore = State(initialValue: CommunityStore(configuration: configuration))
         _scoresStore = State(initialValue: WorldCupScoresStore())
         self.goalAlertsStore = goalAlertsStore
         self.appRouter = appRouter
@@ -28,6 +30,7 @@ public struct ContentView: View {
             .environment(catalogStore)
             .environment(syncStatus)
             .environment(accountStore)
+            .environment(communityStore)
             .environment(scoresStore)
             .environment(goalAlertsStore)
             .environment(appRouter)
@@ -66,6 +69,10 @@ private struct RootTabView: View {
         TabView(selection: $router.selectedTab) {
             Tab("Collection", systemImage: "square.grid.3x3.fill", value: AppTab.collection) {
                 CollectionScreen()
+            }
+
+            Tab("Trade", systemImage: "arrow.left.arrow.right", value: AppTab.trade) {
+                CommunityScreen()
             }
 
             Tab("Scores", systemImage: "soccerball", value: AppTab.scores) {

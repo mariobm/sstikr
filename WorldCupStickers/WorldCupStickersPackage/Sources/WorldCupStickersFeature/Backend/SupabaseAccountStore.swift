@@ -318,7 +318,12 @@ public final class SupabaseAccountStore {
         }
     }
 
-    func saveProfile(displayName: String, handle: String?, visibility: ProfileVisibility) async {
+    func saveProfile(
+        displayName: String,
+        handle: String?,
+        visibility: ProfileVisibility,
+        isDiscoverable: Bool
+    ) async {
         guard let client, let account = currentAccount else {
             state = client == nil ? .notConfigured : .signedOut
             return
@@ -332,7 +337,7 @@ public final class SupabaseAccountStore {
 
         let normalizedHandle = normalizedHandle(handle)
         if let normalizedHandle, !Self.isValidHandle(normalizedHandle) {
-            lastError = "Username can use 3-24 lowercase letters, numbers, hyphens, or underscores."
+            lastError = "Username can use 3-24 lowercase letters, numbers, hyphens, or underscores. Sixteen-character hexadecimal profile links are reserved."
             return
         }
 
@@ -344,7 +349,8 @@ public final class SupabaseAccountStore {
             let payload = ProfileUpdate(
                 displayName: normalizedDisplayName,
                 handle: normalizedHandle,
-                duplicateVisibility: visibility
+                duplicateVisibility: visibility,
+                isDiscoverable: normalizedHandle == nil ? false : isDiscoverable
             )
             let updated: [UserProfile] = try await client
                 .from("profiles")
@@ -387,7 +393,8 @@ public final class SupabaseAccountStore {
                     handle: current.handle,
                     shareSlug: current.shareSlug,
                     avatarURL: current.avatarURL,
-                    duplicateVisibility: visibility
+                    duplicateVisibility: visibility,
+                    isDiscoverable: current.isDiscoverable
                 )
             }
         } catch {
@@ -439,7 +446,8 @@ public final class SupabaseAccountStore {
                     handle: current.handle,
                     shareSlug: current.shareSlug,
                     avatarURL: upload.avatarURL,
-                    duplicateVisibility: current.duplicateVisibility
+                    duplicateVisibility: current.duplicateVisibility,
+                    isDiscoverable: current.isDiscoverable
                 )
             } else {
                 try await completeSignIn(userID: session.user.id, email: session.user.email)
@@ -503,7 +511,8 @@ public final class SupabaseAccountStore {
             handle: nil,
             shareSlug: userID.uuidString,
             avatarURL: nil,
-            duplicateVisibility: .private
+            duplicateVisibility: .private,
+            isDiscoverable: false
         )
     }
 
@@ -516,7 +525,10 @@ public final class SupabaseAccountStore {
     }
 
     private static func isValidHandle(_ handle: String) -> Bool {
-        handle.range(of: #"^[a-z0-9][a-z0-9_-]{2,23}$"#, options: .regularExpression) != nil
+        guard handle.range(of: #"^[a-z0-9][a-z0-9_-]{2,23}$"#, options: .regularExpression) != nil else {
+            return false
+        }
+        return handle.range(of: #"^[a-f0-9]{16}$"#, options: .regularExpression) == nil
     }
 
     static func defaultDisplayName(email: String?) -> String {
@@ -545,7 +557,7 @@ public struct SupabaseAccount: Equatable, Sendable {
 }
 
 public struct UserProfile: Codable, Equatable, Identifiable, Sendable {
-    static let selectColumns = "id, display_name, handle, share_slug, avatar_url, duplicate_visibility"
+    static let selectColumns = "id, display_name, handle, share_slug, avatar_url, duplicate_visibility, is_discoverable"
     static let shareBaseURL = URL(string: "https://sstikr.com/u/")!
 
     public let id: UUID
@@ -554,6 +566,7 @@ public struct UserProfile: Codable, Equatable, Identifiable, Sendable {
     public let shareSlug: String
     public let avatarURL: URL?
     public let duplicateVisibility: ProfileVisibility
+    public let isDiscoverable: Bool
 
     public var sharePathComponent: String {
         if let handle, !handle.isEmpty {
@@ -573,6 +586,7 @@ public struct UserProfile: Codable, Equatable, Identifiable, Sendable {
         case shareSlug = "share_slug"
         case avatarURL = "avatar_url"
         case duplicateVisibility = "duplicate_visibility"
+        case isDiscoverable = "is_discoverable"
     }
 }
 
@@ -636,11 +650,13 @@ private struct ProfileUpdate: Encodable {
     let displayName: String
     let handle: String?
     let duplicateVisibility: ProfileVisibility
+    let isDiscoverable: Bool
 
     enum CodingKeys: String, CodingKey {
         case displayName = "display_name"
         case handle
         case duplicateVisibility = "duplicate_visibility"
+        case isDiscoverable = "is_discoverable"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -652,6 +668,7 @@ private struct ProfileUpdate: Encodable {
             try container.encodeNil(forKey: .handle)
         }
         try container.encode(duplicateVisibility, forKey: .duplicateVisibility)
+        try container.encode(isDiscoverable, forKey: .isDiscoverable)
     }
 }
 

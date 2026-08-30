@@ -17,6 +17,7 @@ struct AccountSheet: View {
     @State private var passkeys: [PasskeyListItem] = []
     @State private var profileDisplayName = ""
     @State private var profileHandle = ""
+    @State private var isProfileDiscoverable = false
     @State private var didCopyProfileLink = false
     @State private var selectedAvatarItem: PhotosPickerItem?
     @State private var avatarPreviewImage: UIImage?
@@ -292,7 +293,16 @@ struct AccountSheet: View {
                 .padding(12)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            Text("Username is used for your public profile link. Leave it empty to use the private share slug.")
+            Text("Username is used for your public profile link. Use 3-24 lowercase letters, numbers, hyphens, or underscores; leave it empty to use the private share slug.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle("Let people find me by username", isOn: $isProfileDiscoverable)
+                .tint(.stickerTeal)
+                .disabled(profileHandle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            Text("People can search your username in the Trade tab. Your collection visibility still controls which duplicates they can see.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -327,7 +337,8 @@ struct AccountSheet: View {
                     await accountStore.saveProfile(
                         displayName: profileDisplayName,
                         handle: profileHandle,
-                        visibility: syncStatus.selectedVisibility
+                        visibility: syncStatus.selectedVisibility,
+                        isDiscoverable: isProfileDiscoverable
                     )
                     populateProfileFields()
                 }
@@ -384,6 +395,7 @@ struct AccountSheet: View {
         guard let profile = accountStore.profile else { return }
         profileDisplayName = profile.displayName
         profileHandle = profile.handle ?? ""
+        isProfileDiscoverable = profile.isDiscoverable
         syncStatus.selectedVisibility = profile.duplicateVisibility
     }
 

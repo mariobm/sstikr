@@ -4,6 +4,10 @@
 
 #include "Shared.xcconfig"
 
+// The UI-test bundle only launches the host app. Do not inherit the host app's
+// APNs or associated-domain capabilities, which its provisioning profile owns.
+CODE_SIGN_ENTITLEMENTS =
+
 // ==========================================
 // Test Target Settings (Customizable by scaffold tool)
 // ==========================================

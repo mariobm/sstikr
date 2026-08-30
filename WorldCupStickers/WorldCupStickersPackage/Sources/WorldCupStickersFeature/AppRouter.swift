@@ -18,6 +18,7 @@ public final class AppRouter {
 
 public enum AppTab: Hashable {
     case collection
+    case trade
     case scores
     case scan
     case settings

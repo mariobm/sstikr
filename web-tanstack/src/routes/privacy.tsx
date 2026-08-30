@@ -10,10 +10,10 @@ function PrivacyPage() {
       <article className="panel policy">
         <div className="eyebrow">Privacy</div>
         <h1>Sstikr Privacy Policy</h1>
-        <p>Effective date: June 30, 2026</p>
+        <p>Effective date: July 11, 2026</p>
         <p>
           Sstikr can work fully offline without an account. Signing in is optional and is only
-          needed if you want cloud sync, profile sharing, or future social features.
+          needed if you want cloud sync, profile sharing, or community trading.
         </p>
         <p>
           We do not sell personal data. We do not use your sticker collection for advertising, and
@@ -28,6 +28,11 @@ function PrivacyPage() {
           choose to sign in and sync.
         </p>
         <p>
+          Community trading data includes whether you opt in to username discovery, friend requests,
+          blocks, trade request messages, requested/offered sticker IDs and quantities, request
+          status, and each participant&apos;s handoff-confirmation status.
+        </p>
+        <p>
           The scanner processes camera frames on device for OCR. Sticker scan images and camera
           frames are not uploaded for sticker detection. If you choose a profile picture, that image
           is uploaded and stored in cloud object storage.
@@ -36,8 +41,8 @@ function PrivacyPage() {
         <h2>How we use data</h2>
         <p>
           We use your data to authenticate your account, sync your collection, show your profile,
-          display duplicate stickers according to your privacy setting, and support future friend
-          and exchange features.
+          display duplicate stickers according to your privacy setting, help opted-in collectors find
+          one another by username, and operate friend and trade requests.
         </p>
         <p>
           We do not sell, rent, or trade your personal data. We do not share your collection data
@@ -47,8 +52,14 @@ function PrivacyPage() {
         <h2>Sharing controls</h2>
         <p>
           Duplicate visibility can be private, friends, mutuals, or public. Public profiles can show
-          allowed duplicate data to anyone with the profile link. Private profiles do not expose
-          duplicate sticker lists on the public web preview.
+          allowed duplicate data to anyone with the profile link. Friends and mutuals visibility is
+          evaluated only for accepted connections. Private profiles do not expose duplicate sticker
+          lists on the public web preview.
+        </p>
+        <p>
+          Username discovery is off by default. When enabled, other signed-in collectors can find a
+          profile by an exact or beginning portion of its username. A block removes the pair from
+          username discovery and prevents private duplicate-list access.
         </p>
 
         <h2>Third-party providers</h2>

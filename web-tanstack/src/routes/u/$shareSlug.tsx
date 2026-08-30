@@ -22,28 +22,19 @@ export const Route = createFileRoute("/u/$shareSlug")({
       return { state: "locked", title: "Backend not configured", shareSlug };
     }
 
-    let { data: profile } = await supabase
-      .from("profiles")
-      .select("id, display_name, handle, share_slug, avatar_url, duplicate_visibility")
-      .eq("share_slug", shareSlug)
-      .maybeSingle<ProfilePreview>();
-
-    if (!profile) {
-      const result = await supabase
-        .from("profiles")
-        .select("id, display_name, handle, share_slug, avatar_url, duplicate_visibility")
-        .eq("handle", shareSlug)
-        .maybeSingle<ProfilePreview>();
-
-      profile = result.data;
-    }
+    // Public profiles are resolved by a narrowly scoped RPC. Do not query the
+    // profiles table directly: that would turn share links into a directory.
+    const { data: profiles } = await supabase.rpc("community_public_profile", {
+      p_identifier: shareSlug
+    });
+    const profile = profiles?.[0] as ProfilePreview | undefined;
 
     if (!profile) {
       return { state: "locked", title: "Profile not found", shareSlug };
     }
 
     const duplicates =
-      profile.duplicate_visibility === "public" ? await loadDuplicates(profile.id) : [];
+      profile.duplicate_visibility === "public" ? await loadDuplicates(shareSlug) : [];
 
     return { state: "profile", profile, duplicates };
   },
@@ -124,55 +115,17 @@ function ProfileSharePage() {
   );
 }
 
-async function loadDuplicates(profileID: string): Promise<DuplicateSticker[]> {
+async function loadDuplicates(profileIdentifier: string): Promise<DuplicateSticker[]> {
   const supabase = getSupabase();
   if (!supabase) {
     return [];
   }
 
-  const { data } = await supabase
-    .from("user_stickers")
-    .select("sticker_id, team_code, sticker_number, quantity, sticker_catalog(display_code, name, image_url)")
-    .eq("user_id", profileID)
-    .gt("quantity", 1)
-    .order("team_code", { ascending: true })
-    .order("sticker_number", { ascending: true })
-    .limit(40);
-
-  const rows = (data ?? []) as DuplicateStickerRow[];
-  return rows.map((row) => {
-    const catalog = Array.isArray(row.sticker_catalog) ? row.sticker_catalog[0] : row.sticker_catalog;
-    return {
-      sticker_id: row.sticker_id,
-      team_code: row.team_code,
-      sticker_number: row.sticker_number,
-      quantity: row.quantity,
-      duplicate_count: Math.max(row.quantity - 1, 0),
-      display_code: catalog?.display_code ?? `${row.team_code} ${row.sticker_number}`,
-      name: catalog?.name ?? `${row.team_code} ${row.sticker_number}`,
-      image_url: catalog?.image_url ?? null
-    };
+  const { data } = await supabase.rpc("community_public_duplicates", {
+    p_identifier: profileIdentifier
   });
+  return (data ?? []) as DuplicateSticker[];
 }
-
-type DuplicateStickerRow = {
-  sticker_id: string;
-  team_code: string;
-  sticker_number: number;
-  quantity: number;
-  sticker_catalog:
-    | {
-        display_code: string;
-        name: string;
-        image_url: string | null;
-      }
-    | {
-        display_code: string;
-        name: string;
-        image_url: string | null;
-      }[]
-    | null;
-};
 
 function LockedProfile({ title, shareSlug }: { title: string; shareSlug: string }) {
   return (
