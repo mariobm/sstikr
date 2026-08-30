@@ -166,12 +166,10 @@ npx wrangler tail sstikr-goal-relay
 GOAL_RELAY_URL = https:/$()/<relay-host>
 ```
 
-Use a neutral custom domain such as `scores.sstikr.com` for a public release. The
-current checkout still contains an account-specific `workers.dev` hostname in
-`Shared.xcconfig`; replace it with the custom domain (or keep it only in
-`Local.xcconfig`) before publishing the repository if you do not want that account
-identity in source history. Do not use the web app's apex routes (`sstikr.com` or
-`www.sstikr.com`) for the relay.
+Use a neutral custom domain such as `scores.sstikr.com` for a public release. Keep
+account-specific `workers.dev` hostnames only in ignored `Local.xcconfig` files or
+inject them at build time; do not put them in tracked shared configuration. Do not
+use the web app's apex routes (`sstikr.com` or `www.sstikr.com`) for the relay.
 
 To attach a custom domain, add it to the relay Worker configuration and deploy after
 confirming the DNS zone is in the same Cloudflare account:
