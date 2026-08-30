@@ -6,6 +6,12 @@ The app can work fully offline. Signing in is optional and is only needed for Su
 
 This is an unofficial collection tracker and is not affiliated with FIFA, Panini, or the FIFA World Cup.
 
+## App showcase
+
+<video src="assets/sstikr-showcase-1.5x.mp4" controls playsinline width="320"></video>
+
+[Download the 1.5× app showcase video](assets/sstikr-showcase-1.5x.mp4)
+
 ## Current Features
 
 - Native SwiftUI iOS app targeting iOS 26.
