@@ -8,9 +8,9 @@ This is an unofficial collection tracker and is not affiliated with FIFA, Panini
 
 ## App showcase
 
-<video src="https://github.com/user-attachments/assets/1f6fa25f-7e35-453f-a335-91a7da23f0f0" controls playsinline width="320"></video>
-
-[Download the 1.5× app showcase video](assets/sstikr-showcase-1.5x.mp4)
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/1f6fa25f-7e35-453f-a335-91a7da23f0f0" controls playsinline width="320"></video>
+</div>
 
 ## Current Features
 
